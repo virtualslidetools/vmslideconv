@@ -28,7 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <iostream>
 #include "jpgsupport.h"
 
-
 int reset_error_mjr(j_common_ptr cinfo)
 {
   return 0;
@@ -57,7 +56,6 @@ int reset_error_mjr(j_common_ptr cinfo)
  * Here's the extended error handler struct:
  */
 
-
 /*
  * Here's the routine that will replace the standard error_exit method:
  */
@@ -77,6 +75,18 @@ void my_jpeg_error_exit(j_common_ptr cinfo)
 }
 
 
+void Jpg::jpgClearAttribs()
+{
+  safeBmpClear(&mFullSrc);
+}
+
+
+void Jpg::jpgCleanup()
+{
+  safeBmpFree(&mFullSrc);
+}
+
+
 bool Jpg::testHeader(BYTE* header, int)
 {
   if (header[0] == 0xFF && header[1] == 0xD8)
@@ -86,31 +96,29 @@ bool Jpg::testHeader(BYTE* header, int)
 }
 
 
-bool Jpg::open(const std::string& newFileName, int orientation, bool setGrayScale)
+bool Jpg::open(const std::string& newFileName, bool setGrayScale)
 {
   FILE *infile = NULL;
   struct jpeg_decompress_struct cinfo;
   struct jpeg_error_mgr jerr;
   JSAMPROW* pjSampleRows = 0; 
   
-  mValidObject = false;
-  msamplesPerPixel = 3;
-  mGrayScale = false;
-  if (mpFullBitmap != 0)
+  if (mValidObject)
   {
-    delete[] mpFullBitmap;
-    mpFullBitmap = 0;
+    jpgCleanup();
+    baseCleanup();
+    jpgClearAttribs();
+    baseClearAttribs();
   }
   memset(&cinfo, 0, sizeof(cinfo));
   memset(&jerr, 0, sizeof(jerr));
 
-  mfileName = newFileName;
-  merrMsg.str("");
+  mFileName = newFileName;
 
-  infile = fopen(mfileName.c_str(), "rb");
+  infile = fopen(mFileName.c_str(), "rb");
   if (infile == 0) 
   {
-    merrMsg << "Error opening '" << mfileName << "': " << std::strerror(errno);
+    mErrMsg << "Error opening '" << mFileName << "': " << std::strerror(errno);
     return false;
   }
 
@@ -122,125 +130,46 @@ bool Jpg::open(const std::string& newFileName, int orientation, bool setGrayScal
     jpeg_create_decompress(&cinfo);
     jpeg_stdio_src(&cinfo, infile);
     jpeg_read_header(&cinfo, TRUE);
-    if (setGrayScale || cinfo.num_components==1) 
+    if (cinfo.num_components==3) 
     {
-      mGrayScale = true;
-      msamplesPerPixel = 1;
-      cinfo.out_color_space = JCS_GRAYSCALE;
-    }
-    jpeg_start_decompress(&cinfo);
-    if (orientation == 90 || orientation == -90 || orientation == 270)
-    {
-      mrenderedWidth = mactualWidth = cinfo.output_height;
-      mrenderedHeight = mactualHeight = cinfo.output_width;
+      mSamplesPerPixel = 3;
     }
     else
     {
-      mrenderedWidth = mactualWidth = cinfo.output_width;
-      mrenderedHeight = mactualHeight = cinfo.output_height;
+      mErrMsg << "Warning: '" << mFileName << "' has unsupported samples per pixel: " << cinfo.num_components << std::endl;
+      return false;
     }
-    mbitCount = msamplesPerPixel * 8;
-
-    mpFullBitmap = new BYTE[mactualWidth * mactualHeight * msamplesPerPixel];
-    memset(mpFullBitmap, mbkgColor, mactualWidth * mactualHeight * msamplesPerPixel);
-    int destLineWidth = mactualWidth * msamplesPerPixel;
-    int totalScanlines=0;
-    if (orientation == 0)
+    jpeg_start_decompress(&cinfo);
+    mActualWidth = cinfo.output_width;
+    mActualHeight = cinfo.output_height;
+    mBitCount = mSamplesPerPixel * 8;
+    safeBmpAlloc2(&mFullSrc, mActualWidth, mActualHeight);
+    mValidObject=true;    
+    safeBmpByteSet(&mFullSrc, mBkgColor);
+    int64_t destLineWidth = mActualWidth * mSamplesPerPixel;
+    int64_t totalScanlines=0;
+    pjSampleRows = new JSAMPROW[mActualHeight];
+    for (int64_t y = 0; y < mActualHeight; y++)
     {
-      pjSampleRows = new JSAMPROW[mactualHeight];
-      for (int y = 0; y < mactualHeight; y++)
-      {
-        pjSampleRows[y] = &mpFullBitmap[mactualWidth * y * msamplesPerPixel];
-      }
-      while (cinfo.output_scanline < cinfo.output_height) 
-      {
-        totalScanlines += jpeg_read_scanlines(&cinfo, &pjSampleRows[totalScanlines], mactualHeight-totalScanlines);
-      }
-      delete[] pjSampleRows;
-      mrenderedHeight=mactualHeight=totalScanlines;
+      pjSampleRows[y] = mFullSrc.data + (y * destLineWidth);
     }
-    else if (orientation == 90)
+    while (cinfo.output_scanline < cinfo.output_height) 
     {
-      std::vector<JSAMPLE> jSamples(cinfo.output_width * 3);
-      JSAMPROW pjSampleRow = &jSamples[0];
-      JSAMPARRAY pjSampleArray = &pjSampleRow;
-      BYTE* pDestEnd = mpFullBitmap + (destLineWidth * mactualHeight);
-      BYTE *pDestStart = mpFullBitmap + (destLineWidth - 3);
-      while (cinfo.output_scanline < cinfo.output_height) 
-      {
-        jpeg_read_scanlines(&cinfo, pjSampleArray, 1);
-        BYTE* pSrc = &jSamples[0];
-        BYTE* pDest = pDestStart;
-        while (pDest < pDestEnd)
-        {
-          pDest[0] = pSrc[0];
-          pDest[1] = pSrc[1];
-          pDest[2] = pSrc[2];
-          pSrc += 3;
-          pDest += destLineWidth;
-        }
-        pDestStart -= 3;
-      }
+      totalScanlines += jpeg_read_scanlines(&cinfo, &pjSampleRows[totalScanlines], mActualHeight-totalScanlines);
     }
-    else if (orientation == -90 || orientation == 270)
-    {
-      std::vector<JSAMPLE> jSamples(cinfo.output_width * 3);
-      JSAMPROW pjSampleRow = &jSamples[0];
-      JSAMPARRAY pjSampleArray = &pjSampleRow;
-      BYTE* pLastRow = mpFullBitmap + ((mactualHeight - 1) * destLineWidth);
-      int destX = 0;
-      while (cinfo.output_scanline < cinfo.output_height) 
-      {
-        jpeg_read_scanlines(&cinfo, pjSampleArray, 1);
-        BYTE* pSrc = &jSamples[0];
-        BYTE* pDest = pLastRow + (destX * 3);
-        while (pDest >= mpFullBitmap)
-        {
-          pDest[0] = pSrc[0];
-          pDest[1] = pSrc[1];
-          pDest[2] = pSrc[2];
-          pSrc += 3;
-          pDest -= destLineWidth;
-        }
-        destX++;
-      }
-    }
-    else if (orientation == 180)
-    {
-      std::vector<JSAMPLE> jSamples(cinfo.output_width * 3);
-      JSAMPROW pjSampleRow = &jSamples[0];
-      JSAMPARRAY pjSampleArray = &pjSampleRow;
-      BYTE* pSrcEnd = &jSamples[destLineWidth];
-      BYTE* pDestStart = mpFullBitmap + ((mactualHeight - 1) * destLineWidth) + (destLineWidth - 3);
-      while (cinfo.output_scanline < cinfo.output_height) 
-      {
-        jpeg_read_scanlines(&cinfo, pjSampleArray, 1);
-        BYTE* pSrc = &jSamples[0];
-        BYTE* pDest = pDestStart;
-        while (pSrc < pSrcEnd)
-        {
-          pDest[0] = pSrc[0];
-          pDest[1] = pSrc[1];
-          pDest[2] = pSrc[2];
-          pSrc += 3;
-          pDest -= 3;
-        }
-        pDestStart -= destLineWidth;
-      }
-    } 
     jpeg_finish_decompress(&cinfo);
     jpeg_destroy_decompress(&cinfo);
+    delete[] pjSampleRows;
+    pjSampleRows = 0;
     fclose(infile);
     infile = 0;
-    mValidObject=true;
   }
   catch (jpeg_error_mgr* pJerr) 
   {
-    merrMsg << "Error decompressing '" << mfileName << "': ";
-    merrMsg << pJerr->jpeg_message_table[pJerr->msg_code];
+    mErrMsg << "Error decompressing '" << mFileName << "': ";
+    mErrMsg << pJerr->jpeg_message_table[pJerr->msg_code];
     jpeg_destroy_decompress(&cinfo);
     if (infile) fclose(infile);
-    cleanup();
     if (pjSampleRows)
     {
       delete[] pjSampleRows;
@@ -249,87 +178,51 @@ bool Jpg::open(const std::string& newFileName, int orientation, bool setGrayScal
   } 
   catch (std::bad_alloc &e) 
   {
-    mpFullBitmap = 0;
     jpeg_destroy_decompress(&cinfo);
     if (infile) fclose(infile);
-    cleanup();
     if (pjSampleRows)
     {
       delete[] pjSampleRows;
     }
-    merrMsg << "Insufficient memory to decompress '" << mfileName;
-    merrMsg << "' into memory";
-    return false;
+    mErrMsg << "Insufficient memory to decompress '" << mFileName;
+    mErrMsg << "' into memory";
+    throw std::runtime_error(mErrMsg.str());
   }
   return true;
 }
 
 
-bool Jpg::read(int x, int y, int width, int height, bool passedGrayscale)
+bool Jpg::read(safeBmp *pBmpDest, int64_t x, int64_t y, int64_t width, int64_t height)
 {
-  if (mpBitmap != 0)
-  {
-    delete[] mpBitmap;
-    mpBitmap = 0;
-  }
-  if (mpFullBitmap==0)
-  {
-    std::cerr << "Error: Jpg not loaded into memory yet." << std::endl;
-    return false;
-  }
-  mreadWidth=0;
-  mreadHeight=0;
-  merrMsg.str("");
-  if (x<0 || y<0 || x>mactualWidth || y>mactualHeight || height<=0 || width<=0) 
+  if (mValidObject==false) return false;
+  mReadWidth=0;
+  mReadHeight=0;
+  mErrMsg.str("");
+  if (x<0 || y<0 || x>mActualWidth || y>mActualHeight || height<=0 || width<=0) 
   {
     std::cerr << "In jpeg::read parameters out of bounds." << std::endl;
     return false;
   }
-  if (x+width > mactualWidth)
+  if (x+width > mActualWidth)
   {
-    width = mactualWidth - x;
-    std::cerr << "In jpeg::read, width truncated. Actual width=" << mactualWidth;
+    std::cerr << "In jpeg::read, width truncated. Actual width=" << mActualWidth;
     std::cerr << " x=" << x << " width=" << width << std::endl;
+    width = mActualWidth - x;
   }
-  if (y+height > mactualHeight)
+  if (y+height > mActualHeight)
   {
-    height = mactualHeight - y;
-    std::cerr << "In jpeg::read, height truncated. Actual height=" << mactualHeight;
+    std::cerr << "In jpeg::read, height truncated. Actual height=" << mActualHeight;
     std::cerr << " y=" << y << " height=" << height << std::endl;
+    height = mActualHeight - y;
   }
-  int samplesPerPixel=3;
-  if (passedGrayscale || mGrayScale)
-  {
-    samplesPerPixel=1;
-  }
-  try
-  {
-    int bitmapSize = width*height*samplesPerPixel;
-    int tileRowSize = width * samplesPerPixel;
-    mpBitmap = new BYTE[bitmapSize];
-//    std::cout << "In jpgsupport.cpp: width=" << width << " height=" << height << " samplesPerPixel" << samplesPerPixel << std::endl;
-    memset(mpBitmap, mbkgColor, bitmapSize);
-    int row=y;
-    for (int yDest=0; yDest<height && row<(y+height); yDest++) 
-    {
-      memcpy(&mpBitmap[yDest*tileRowSize], &mpFullBitmap[(mactualWidth*row*msamplesPerPixel)+(x*msamplesPerPixel)], width*samplesPerPixel);
-      row++;
-    } 
-    mreadHeight=height;
-    mreadWidth=width;
-    mValidObject = true;
-  }
-  catch (std::bad_alloc &e) 
-  {
-    merrMsg << "Insufficient memory to decompress '" << mfileName;
-    merrMsg << "' into memory";
-    exit(1);
-  }
+  safeBmpCpy(pBmpDest, 0, 0, &mFullSrc, x, y, width, height);
+  mReadWidth = width;
+  mReadHeight = height;
   return true;
 }
 
 
-bool my_jpeg_write(std::string& newFileName, BYTE *pFullBitmap, int width, int height, int quality, std::string* perrMsg)
+bool my_jpeg_write(std::string& newFileName, BYTE *pFullBitmap, int64_t width, int64_t height, int quality, std::string* perrMsg)
 {
   struct jpeg_compress_struct cinfo;
   struct jpeg_error_mgr jerr;
@@ -364,12 +257,12 @@ bool my_jpeg_write(std::string& newFileName, BYTE *pFullBitmap, int width, int h
     jpeg_start_compress(&cinfo, TRUE);
     /* like reading a file, this time write one row at a time */
     pjSampleRows = new JSAMPROW[height];
-    for (int y = 0; y < height; y++)
+    for (int64_t y = 0; y < height; y++)
     {
       pjSampleRows[y] = &pFullBitmap[width * y * 3];
     }
-    int totalScanlines=0;
-    while ((int) cinfo.next_scanline < height) 
+    int64_t totalScanlines=0;
+    while ((int64_t)cinfo.next_scanline < height) 
     {
       totalScanlines += jpeg_write_scanlines(&cinfo, &pjSampleRows[totalScanlines], height-totalScanlines);
     }
@@ -378,6 +271,7 @@ bool my_jpeg_write(std::string& newFileName, BYTE *pFullBitmap, int width, int h
     jpeg_destroy_compress(&cinfo);
     fclose(outfile);
     delete[] pjSampleRows;
+    pjSampleRows = 0;
   }
   catch (jpeg_error_mgr* pJerr) 
   {
@@ -393,12 +287,14 @@ bool my_jpeg_write(std::string& newFileName, BYTE *pFullBitmap, int width, int h
     if (pjSampleRows)
     {
       delete[] pjSampleRows;
+      pjSampleRows = 0;
     }
     return false;
   } 
   catch (std::bad_alloc &e) 
   {
-    std::cerr << "Fatal Error: Not enough memory to decompress '" << newFileName;
+    std::cerr << "Fatal Error: Not enough memory to decompress '";
+    std::cerr << newFileName;
     std::cerr << "' into memory!";
     exit(1);
   }
@@ -406,7 +302,7 @@ bool my_jpeg_write(std::string& newFileName, BYTE *pFullBitmap, int width, int h
 }
 
 
-bool my_jpeg_compress(BYTE** ptpCompressedBitmap, BYTE *pFullBitmap, int width, int height, int quality, std::string* perrMsg, unsigned long *pOutSize)
+bool my_jpeg_compress(BYTE** ptpCompressedBitmap, BYTE *pFullBitmap, int64_t width, int64_t height, int quality, std::string* perrMsg, unsigned long *pOutSize)
 {
   struct jpeg_compress_struct cinfo;
   struct jpeg_error_mgr jerr;
@@ -439,12 +335,12 @@ bool my_jpeg_compress(BYTE** ptpCompressedBitmap, BYTE *pFullBitmap, int width, 
     jpeg_start_compress(&cinfo, TRUE);
     /* like reading a file, this time write one row at a time */
     pjSampleRows = new JSAMPROW[height];
-    for (int y = 0; y < height; y++)
+    for (int64_t y = 0; y < height; y++)
     {
       pjSampleRows[y] = &pFullBitmap[width * y * 3];
     }
-    int totalScanlines=0;
-    while ((int) cinfo.next_scanline < height) 
+    int64_t totalScanlines=0;
+    while (cinfo.next_scanline < height) 
     {
       totalScanlines += jpeg_write_scanlines(&cinfo, &pjSampleRows[totalScanlines], height-totalScanlines);
     }
@@ -452,6 +348,7 @@ bool my_jpeg_compress(BYTE** ptpCompressedBitmap, BYTE *pFullBitmap, int width, 
     jpeg_finish_compress(&cinfo);
     jpeg_destroy_compress(&cinfo);
     delete[] pjSampleRows;
+    pjSampleRows = 0;
   }
   catch (jpeg_error_mgr* pJerr) 
   {
@@ -464,6 +361,7 @@ bool my_jpeg_compress(BYTE** ptpCompressedBitmap, BYTE *pFullBitmap, int width, 
     if (pjSampleRows)
     {
       delete[] pjSampleRows;
+      pjSampleRows = 0;
     }
     if (*ptpCompressedBitmap)
     {
@@ -480,6 +378,7 @@ bool my_jpeg_compress(BYTE** ptpCompressedBitmap, BYTE *pFullBitmap, int width, 
   return true;
 }
 
+
 void my_jpeg_free(BYTE** ptpCompressedBitmap)
 {
   if (ptpCompressedBitmap != NULL && *ptpCompressedBitmap != NULL)
@@ -488,217 +387,3 @@ void my_jpeg_free(BYTE** ptpCompressedBitmap)
     *ptpCompressedBitmap = NULL;
   }
 }
-
-bool Jpg::unbufferedRead(int x, int y, int width, int height)
-{
-  FILE *infile = NULL;
-  struct jpeg_decompress_struct cinfo;
-  struct jpeg_error_mgr jerr;
-
-  memset(&cinfo, 0, sizeof(cinfo));
-  memset(&jerr, 0, sizeof(jerr));
-
-  //if (mValidObject) cleanup();
-  if (mpBitmap != 0)
-  {
-    delete[] mpBitmap;
-    mpBitmap = 0;
-  }
- 
-  mreadWidth=0;
-  mreadHeight=0;
-  merrMsg.str("");
-  if (x<0 || y<0 || x>mactualWidth || y>mactualHeight || height<=0 || width<=0) 
-  {
-    std::cerr << "In jpeg::read parameters out of bounds." << std::endl;
-    return false;
-  }
-  if (x+width > mactualWidth)
-  {
-    width = mactualWidth;
-    std::cerr << "In jpeg::read, width truncated." << std::endl;
-  }
-  if (y+height > mactualHeight)
-  {
-    height = mactualHeight;
-    std::cerr << "In jpeg::read, height truncated." << std::endl;
-  }
-  try
-  {
-    infile = fopen(mfileName.c_str(), "rb");
-    if (infile == 0) 
-    {
-      merrMsg << "Error opening '" << mfileName << "': " << std::strerror(errno);
-      return false;
-    }
-
-    cinfo.err = jpeg_std_error(&jerr);
-    jerr.error_exit = my_jpeg_error_exit;
-
-    /* Now we can initialize the JPEG decompression object. */
-    jpeg_create_decompress(&cinfo);
-
-    /* Step 2: specify data source (eg, a file) */
-    jpeg_stdio_src(&cinfo, infile);
-
-    /* Step 3: read file parameters with jpeg_read_header() */
-    jpeg_read_header(&cinfo, TRUE);
-    /* We can ignore the return value from jpeg_read_header since
-    *   (a) suspension is not possible with the stdio data source, and
-    *   (b) we passed TRUE to reject a tables-only JPEG file as an error.
-    * See libjpeg.doc for more info.
-    */
-
-    /* Step 4: set parameters for decompression */
-
-    /* In this example, we don't need to change any of the defaults set by
-     * jpeg_read_header(), so we do nothing here.
-     */
-
-    /* Step 5: Start decompressor */
-    jpeg_start_decompress(&cinfo);
-    /* We can ignore the return value since suspension is not possible
-     * with the stdio data source.
-     */
-
-    /* We may need to do some setup of our own at this point before reading
-     * the data.  After jpeg_start_decompress() we have the correct scaled
-     * output image dimensions available, as well as the output colormap
-     * if we asked for color quantization.
-     * In this example, we need to make an output work buffer of the right size.
-     */ 
-    /* JSAMPLEs per row in output buffer */
-    mactualWidth = cinfo.output_width; //cinfo.image_width;
-    mactualHeight = cinfo.output_height; //cinfo.image_height;
-    calcRenderedDims();
-    mbitCount = 3 * 8;
-    munpaddedScanlineBytes = cinfo.output_width * 3;
-   /* Make a one-row-high sample array that will go away when done with image */
-    //buffer = (*cinfo.mem->alloc_sarray)
-    //  ((j_common_ptr) &cinfo, JPOOL_IMAGE, paddedScanlineBytes, 1);
-    mbitmapSize = width*height*3;
-    uint tileRowSize = width * 3;
-    mpBitmap = new BYTE[mbitmapSize];
-//        dprintf("jpeg tile size: %i\n", bitmapSize);
-
-    /* Step 6: while (scan lines remain to be read) */
-    /*           jpeg_read_scanlines(...); */
-
-    /* Here we use the library's state variable cinfo.output_scanline as the
-     * loop counter, so that we don't have to keep track ourselves.
-     */
-    if (cinfo.output_components == 3) 
-    {
-        std::vector<JSAMPLE> jSamples(cinfo.output_width * 3);
-        JSAMPROW pjSampleRow = &jSamples[0];
-        JSAMPARRAY pjSampleArray = &pjSampleRow;
-        int yDest = 0;
-        while (cinfo.output_scanline < cinfo.output_height) 
-        {
-            jpeg_read_scanlines(&cinfo, pjSampleArray, 1);
-            if (width > (int) cinfo.output_width)
-            {
-              width = cinfo.output_width;
-            }
-            if ((int) cinfo.output_scanline >= y && (int) cinfo.output_scanline <= y+height && yDest < height)
-            {
-              memcpy(&mpBitmap[yDest*tileRowSize], &jSamples[x*3], width*3);
-              yDest++;
-            }
-        }
-    } 
-    else if (cinfo.output_components == 1) 
-    {
-        std::vector<JSAMPLE> jSamples(cinfo.output_width);
-        JSAMPROW pjSampleRow = &jSamples[0];
-        JSAMPARRAY pjSampleArray = &pjSampleRow;
-        int yDest = 0;
-        while (cinfo.output_scanline < cinfo.output_height) 
-        {
-            /* jpeg_read_scanlines expects an array of pointers to scanlines.
-             * Here the array is only one element long, but you could ask for
-             * more than one scanline at a time if that's more convenient.
-             */
-            /* Assume put_scanline_someplace wants a pointer and sample count. */
-            jpeg_read_scanlines(&cinfo, pjSampleArray, 1);
-    
-            JSAMPLE *dest = &mpBitmap[yDest * tileRowSize];
-            // Copy loop for RGB data
-            // Note: the windows GDI bitmap functions take bitmaps in BGR order
-            /*
-            if (cinfo.output_components == 3) {
-                unsigned int i;
-                for (i = 0; i < unpaddedScanlineBytes; i+=3) {
-                    dest[i] = jsamples[i+2];
-                    dest[i+1] = jsamples[i+1];
-                    dest[i+2] = jsamples[i];
-                }
-                while (i < paddedScanlineBytes) {
-                    dest[i] = 0;
-                    i++;
-                }
-            */
-            // Copy loop for grey scale data
-            uint srci, desti;
-            for (srci = x, desti = 0; (int) srci < mactualWidth; srci++, desti+=3) 
-            {
-                dest[desti+2] = dest[desti+1] = dest[desti] = jSamples[srci];
-            }
-        }
-    }
-    mreadHeight=height;
-    mreadWidth=width;
-    jpeg_finish_decompress(&cinfo);
-    jpeg_destroy_decompress(&cinfo);
-
-    fclose(infile);
-    infile = 0;
-
-    mValidObject = true;
-  } 
-  catch (jpeg_error_mgr* pJerr) 
-  {
-  /* If we get here, the JPEG library has signaled an error.
-   * We need to clean up the JPEG object, close the input file, and return.
-   */
-    merrMsg << "Error decompressing '" << mfileName << "': ";
-    merrMsg << pJerr->jpeg_message_table[pJerr->msg_code];
-    jpeg_destroy_decompress(&cinfo);
-    if (infile) fclose(infile);
-    cleanup();
-    return false;
-  } 
-  catch (std::bad_alloc &e) 
-  {
-    jpeg_destroy_decompress(&cinfo);
-    if (infile) fclose(infile);
-    cleanup();
-    merrMsg << "Insufficient memory to decompress '" << mfileName;
-    merrMsg << "' into memory";
-    return false;
-  }
-  return true;
-}
-
-
-void Jpg::close()
-{
-  if (mpFullBitmap != 0)
-  {
-    delete[] mpFullBitmap;
-    mpFullBitmap = 0;
-  }
-  // pBitmap is deallocated in cleanup 
-  cleanup();
-  initialize();
-}
-
-
-void Jpg::initialize()
-{
-  munpaddedScanlineBytes = 0; 
-  mValidObject = false;
-  mpFullBitmap = 0;
-  mpBitmap = 0;
-}
-

@@ -19,41 +19,99 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 *******************************************************************************/
-#ifndef TIFFSUPPORT_H
-#define TIFFSUPPORT_H
+#ifndef __TIFFSUPPORT_FILE_H
+#define __TIFFSUPPORT_FILE_H
 
 #include <cstring>
 #include <cstdio>
+#include <cstdint>
 #include "imagesupport.h"
+#include "safebmp.h"
 
 namespace TIFFLIB {
-extern "C" {
 #include "tiffio.h"
 }
-}
+
+typedef struct tiff_dir_attribs
+{
+  int dirno; 
+  int64_t width;
+  int64_t length;
+  int compression;
+  int tileWidth;
+  int tileLength;
+  int tileDepth;
+  int64_t tileSize;
+  int quality;
+  int bitsPerSample;
+  int bitCount;
+  int samplesPerPixel;
+  int imageDepth;
+  int rowsPerStrip;
+  int64_t stripSize;
+  int photometric;
+  int planarConfig;
+  int64_t unpaddedScanlineBytes;
+  int64_t paddedScanlineBytes;
+  int64_t bitmapSize;
+  int64_t totalTiles;
+  double xAdj;
+  double yAdj;
+  std::string description;
+} TiffDirAttribs;
+
+typedef struct tiff_photometric_desc
+{
+  uint16_t photometric;
+  char const* description;
+} TiffPhotometricDesc;
 
 
 class Tiff : public Image {
+protected:
+  TIFFLIB::TIFF* mTif;
+  safeBmp mDestBmp;
+  std::vector<TiffDirAttribs*> mDir;
+  std::vector<TiffDirAttribs*> mDirBottomUp;
+  int mDirCount;
+  int mBaseDirno;
+  int mTileWidth, mTileHeight;
+  int mQuality;
+  int mLastDir;
+  int mLastLevel;
+  bool mDebugMode;
+  static TiffPhotometricDesc mPhotoStrings[11];
 public:
-	bool read(int, int, int, int, bool setGrayScale = false) { return false; }
-  bool open(const std::string&, int orientation = 0, bool setGrayScale = false) { return false; }
-  bool load(const std::string& newFileName);
+  Tiff() { tiffClearAttribs(); }
+	virtual ~Tiff() { tiffCleanup(); }
+  void tiffClearAttribs();
+  void tiffCleanup();
+  void close() { tiffCleanup(); baseCleanup(); tiffClearAttribs(); baseClearAttribs(); }
+  bool read(safeBmp* pDestBmp, int level, int64_t x, int64_t y, int64_t cx, int64_t cy, int64_t *pReadWidth, int64_t *pReadHeight);
+  bool open(const std::string&, bool setGrayScale = false);
   bool createFile(const std::string& newFilename);
   bool setThumbNail();
-  void close() { if (mtif) { TIFFClose(mtif); mtif=0; } } 
-	bool setAttributes(int newSamplesPerPixel, int newBitsPerSample, int newImageWidth, int newImageHeight, int newTileWidth, int newTileHeight, int newTileDepth, int quality);
+  void setDebugMode(bool mode) { mDebugMode = mode; }
+  bool setAttributes(int newSamplesPerPixel, int newBitsPerSample, int64_t newImageWidth, int64_t newImageHeight, int newTileWidth, int newTileHeight, int newTileDepth, int quality);
   bool setDescription(std::string& strAttributes, int baseWidth, int baseHeight);
+  bool setDirectory(int dirno);
+  bool setBottomUpDirectory(int dirno);
+  int directorySize() { return mDirCount; }
+  TiffDirAttribs* getDirectoryAttribs(int dirno);
+  TiffDirAttribs* at(int dirno);
   bool writeDirectory();
-  bool writeEncodedTile(BYTE* buff, unsigned int x, unsigned int y, unsigned int z);
+  bool writeEncodedTile(BYTE* buff, int64_t x, int64_t y, int64_t z);
   bool writeImage(BYTE* buff);
-  Tiff() { mtif=0; mquality=70; }
-	~Tiff() { }
 	static bool testHeader(BYTE*, int);
-protected:
-  TIFFLIB::TIFF* mtif;
-  int mtileWidth, mtileHeight;
-  int mquality;
+};
+
+class AttribSortPyramid
+{
+public:
+  bool operator() (const TiffDirAttribs* attrib1, const TiffDirAttribs* attrib2) 
+  {
+    return ((double) attrib1->width* (double) attrib1->length) > ((double) attrib2->width*(double) attrib2->length);
+  }
 };
 
 #endif
-

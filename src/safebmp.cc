@@ -7,8 +7,8 @@
 
 safeBmp * safeBmpAlloc(int64_t width, int64_t height)
 {
-  //int64_t stideWidth = cairoFormatStrideForWidth(CAIROFORMATRGB24, width);
   safeBmp *bmp=NULL;
+  
   int64_t strideWidth = width * 3;
   try 
   {
@@ -46,7 +46,6 @@ safeBmp * safeBmpAlloc(int64_t width, int64_t height)
 
 BYTE* safeBmpAlloc2(safeBmp *bmp, int64_t width, int64_t height)
 {
-  //int64_t stideWidth = cairoFormatStrideForWidth(CAIROFORMATRGB24, width);
   bmp->data = NULL;
   int64_t strideWidth = width * 3;
   try
@@ -71,6 +70,50 @@ BYTE* safeBmpAlloc2(safeBmp *bmp, int64_t width, int64_t height)
     bmp->width = width;
   }
   else
+  {
+    bmp->freeData = false;
+    bmp->freePtr = false;
+    bmp->strideWidth = 0;
+    bmp->height = 0;
+    bmp->width = 0;
+  }
+  return bmp->data;
+}
+
+
+BYTE* safeBmpReAlloc2(safeBmp *bmp, int64_t width, int64_t height)
+{
+  int64_t strideWidth = width * 3;
+  if (bmp->width != width || bmp->height != height)
+  {
+    try
+    {
+      if (bmp->data)
+      {
+        delete[] bmp->data;
+        bmp->data = 0;
+      }
+      if (strideWidth > 0 && height > 0)
+      {
+        bmp->data = new BYTE[strideWidth * height];
+      }
+    }
+    catch (std::bad_alloc &xa)
+    {
+      bmp->data = NULL;
+      std::cerr << "Failed to allocate image of memory size=" << ((strideWidth * height) / 1024) << " kb." << std::endl;
+      exit(1);
+    }
+    if (bmp->data)
+    {
+      bmp->freeData = true;
+      bmp->freePtr = false;
+      bmp->strideWidth = strideWidth;
+      bmp->height = height;
+      bmp->width = width;
+    }
+  }
+  if (bmp->data == 0)
   {
     bmp->freeData = false;
     bmp->freePtr = false;
@@ -134,8 +177,6 @@ void safeBmpUint32Set(safeBmp *bmp, uint32_t value)
 
 void safeBmpCpy(safeBmp *bmpDest, int64_t xDest, int64_t yDest, safeBmp *bmpSrc, int64_t xSrc, int64_t ySrc, int64_t cols, int64_t rows)
 {
-  //assert(bmpSrc->data);
-  //assert(bmpDest->data);
   int64_t xEnd = xSrc + cols;
   if (xSrc < 0)
   {
@@ -286,3 +327,67 @@ void safeBmpBGRtoRGBCpy(safeBmp *bmpDest, safeBmp *bmpSrc)
   }
 }
 
+
+void safeBmpRotate(safeBmp *bmpDest, safeBmp *bmpSrc, int orientation)
+{
+  int64_t srcWidth = bmpSrc->width;
+  int64_t srcHeight = bmpSrc->height;
+  int64_t srcLineWidth = srcWidth * 3;
+  BYTE *in = bmpSrc->data;
+  BYTE *out = bmpDest->data;
+
+  if (orientation == 90)
+  {
+    if (srcWidth > bmpDest->height || srcHeight > bmpDest->width) return;
+    int64_t destLineWidth = bmpDest->width * 3;
+    for (int64_t xSrc=0; xSrc < srcWidth; xSrc++)
+    {
+      int64_t xOffset = xSrc * 3;
+      BYTE *outLine = out + (xSrc * destLineWidth);
+      for (int64_t ySrc=0; ySrc < srcHeight; ySrc++)
+      {
+        BYTE* inLine = in + ((srcHeight - ySrc - 1) * srcLineWidth);
+        inLine += xOffset;
+        *outLine++ = *inLine++;
+        *outLine++ = *inLine++;
+        *outLine++ = *inLine++;
+      }
+    }
+  }
+  else if (orientation == 180)
+  {
+    if (srcWidth > bmpDest->width || srcHeight > bmpDest->height) return;
+    BYTE *inLine = in;
+    int64_t destLineWidth = bmpDest->width * 3;
+    int64_t xDestAlign = (destLineWidth - srcLineWidth) + 3;
+    for (int64_t ySrc=0; ySrc < srcHeight; ySrc++)
+    {
+      BYTE *outLine = out + (((srcHeight - ySrc)) * destLineWidth) - xDestAlign;
+      for (int64_t xSrc=0; xSrc < srcWidth; xSrc++)
+      {
+        *outLine++ = *inLine++;
+        *outLine++ = *inLine++;
+        *outLine++ = *inLine++;
+        outLine -= 6;
+      }
+    }
+  }
+  else if (orientation == 270 || orientation == -90)
+  {
+    if (srcWidth > bmpDest->height || srcHeight > bmpDest->width) return;
+    int64_t destLineWidth = srcHeight * 3;
+    int64_t srcLineWidth = srcWidth * 3;
+    for (int64_t xSrc=0; xSrc < srcWidth; xSrc++)
+    {
+      BYTE* outLine = out + (srcWidth - xSrc - 1) * destLineWidth;
+      int64_t xSrcOffset = xSrc * 3;
+      for (int64_t ySrc=0; ySrc < srcHeight; ySrc++)
+      {
+        BYTE* inLine = in + (ySrc * srcLineWidth) + xSrcOffset;
+        *outLine++ = *inLine++;
+        *outLine++ = *inLine++;
+        *outLine++ = *inLine++;
+      }
+    }
+  }
+}

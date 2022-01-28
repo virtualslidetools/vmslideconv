@@ -1,32 +1,32 @@
-#if !defined(BLENDBKGD_H)
-#define BLENDBKGD_H
+#ifndef __BLENDBKGD_FILE_H
+#define __BLENDBKGD_FILE_H
 
 class BlendSection
 {
 protected:
-  int64_t start, free;
-  BlendSection *next;
+  int64_t mStart, mFree;
+  BlendSection *mNext;
 public:
   BlendSection()
   {
-    this->start = 0;
-    this->free = 0;
-    this->next = NULL;
+    mStart = 0;
+    mFree = 0;
+    mNext = NULL;
   }
   BlendSection(int64_t value)
   {
-    this->start = value;
-    this->free = 0;
-    this->next = NULL;
+    mStart = value;
+    mFree = 0;
+    mNext = NULL;
   }  
-  inline void setStart(int64_t value) { this->start = value; }
-  inline void clearFree() { this->free = 0; }
-  inline void incrementFree() { this->free++; }
-  inline void setNext(BlendSection *value) { this->next = value; }
-  inline int64_t getStart() { return this->start; }
-  inline int64_t getFree() { return this->free; }
-  inline BlendSection* getNext() { return this->next; }
-  inline void setFree(int64_t free) { this->free = free; }
+  inline void setStart(int64_t value) { mStart = value; }
+  inline void clearFree() { mFree = 0; }
+  inline void incrementFree() { mFree++; }
+  inline void setNext(BlendSection *value) { mNext = value; }
+  inline int64_t getStart() { return mStart; }
+  inline int64_t getFree() { return mFree; }
+  inline BlendSection* getNext() { return mNext; }
+  inline void setFree(int64_t free) { mFree = free; }
 };
 
 typedef struct 
@@ -45,4 +45,3 @@ void blendLevelsFree(BlendSection** yFreeMap, int64_t ySize);
 void blendLevels(BlendArgs *args);
 
 #endif
-

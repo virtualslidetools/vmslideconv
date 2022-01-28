@@ -18,27 +18,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <new>
 #include <vector>
 #include <string>
+#include <iostream>
 #include <cstdio>
 #include <cstring>
+#include <cstdlib>
 #include <sstream>
 #include <memory>
 #include <stdexcept>
+#include <algorithm>
 #include "imagesupport.h"
 #include "tiffsupport.h"
+#include "jp2kdecode.h"
+#include "tilecachesupport.h"
 
-using namespace TIFFLIB;
+extern TileCache tileCache;
+
+TiffPhotometricDesc Tiff::mPhotoStrings[11] = 
+{
+  { PHOTOMETRIC_MINISWHITE, "Minimal is White" },
+  { PHOTOMETRIC_MINISBLACK, "Minimal is Black" },
+  { PHOTOMETRIC_MASK, "Hold Mask" },
+  { PHOTOMETRIC_SEPARATED, "Color Separated" },
+  { PHOTOMETRIC_YCBCR, "YCBCR/CCIR 601" },
+  { PHOTOMETRIC_CIELAB, "CIE Lab" },
+  { PHOTOMETRIC_ICCLAB, "ICC Lab" },
+  { PHOTOMETRIC_ITULAB, "ITU Lab" },
+  { PHOTOMETRIC_LOGL, "CIE Log2(L)" },
+  { PHOTOMETRIC_LOGLUV, "CIE Log2(L) (u', v')" },
+  { 0, NULL }
+};
+
+
 #define CVT(x)  (((x) * 255L) / ((1L<<16)-1))
 
-/*
-static int colorMapBitCount(int n, uint16 *r, uint16 *g, uint16 *b)
+
+void strReplaceAll(std::string& str, const std::string& from, const std::string& to) 
 {
-  while (n-- > 0) {
-    if (*r++ >= 256 || *g++ >= 256 || *b++ >= 256)
-      return 16;
+  if(from.empty())
+    return;
+  size_t start_pos = 0;
+  while((start_pos = str.find(from, start_pos)) != std::string::npos) 
+  {
+    str.replace(start_pos, from.length(), to);
+    start_pos += to.length(); // In case 'to' contains 'from', like replacing 'x' with 'yx'
   }
-  return 8;
 }
-*/
+
 
 bool Tiff::testHeader(BYTE* header, int size)
 {
@@ -51,114 +76,565 @@ bool Tiff::testHeader(BYTE* header, int size)
 }
 
 
-bool Tiff::writeEncodedTile(BYTE* buff, unsigned int x, unsigned int y, unsigned int z)
+void Tiff::tiffClearAttribs()
 {
-  if (mtif)
+  mTif = 0; 
+  safeBmpClear(&mDestBmp);
+  mDirCount = 0;
+  mBaseDirno = 0; 
+  mTileWidth = 0; 
+  mTileHeight = 0; 
+  mLastDir = 0;
+  mLastLevel = -1;
+}
+
+
+void Tiff::tiffCleanup()
+{
+  if (mTif) 
+  { 
+    TIFFLIB::TIFFClose(mTif); 
+    mTif=0; 
+  } 
+  for (size_t i = 0; i < mDir.size(); i++)
   {
-    ttile_t tile = TIFFComputeTile(mtif, x, y, z, 0);
-    tsize_t saved = TIFFWriteEncodedTile(mtif, tile, buff, (mtileWidth*mtileHeight*mbitCount*msamplesPerPixel)/8);
-    if (saved==(mtileWidth*mtileHeight*mbitCount*msamplesPerPixel)/8)
+    if (mDir[i])
     {
-      return true;
+      delete mDir[i];
+      mDir[i] = 0;
     }
+  }
+  mDir.clear();
+  mDirBottomUp.clear();
+}
+
+
+TiffDirAttribs* Tiff::getDirectoryAttribs(int dirno) 
+{ 
+  return (dirno >= 0 && dirno < mDirCount) ? mDirBottomUp[dirno] : 0;
+}
+
+
+TiffDirAttribs* Tiff::at(int dirno) 
+{ 
+  return (dirno >= 0 && dirno < mDirCount) ? mDirBottomUp[dirno] : 0; 
+}
+
+
+bool Tiff::setDirectory(int dirno) 
+{ 
+  bool success = false;
+  if (mLastDir != dirno)
+  {
+    if (mDirCount > 0 && dirno >= 0 && dirno < mDirCount) 
+    { 
+      success = TIFFLIB::TIFFSetDirectory(mTif, dirno) == 1 ? true : false; 
+      if (success)
+      {
+        mLastDir = dirno;
+        mLastLevel = -1;
+      }
+    }
+  } 
+  else
+  {
+    success = true;
+  }
+  return success; 
+}
+
+
+bool Tiff::setBottomUpDirectory(int level)
+{
+  bool success = false;
+  if (mValidObject)
+  {
+    if (mLastLevel != level)
+    {
+      if (mDirCount > 0 && level >= 0 && level < mDirCount) 
+      { 
+        int dirno = mDirBottomUp[level]->dirno;
+        success = TIFFLIB::TIFFSetDirectory(mTif, dirno) == 1 ? true : false; 
+        if (success)
+        {
+          mLastDir = dirno;
+          mLastLevel = level;
+        }
+      }
+    } 
     else
     {
-      return false;
+      success = true;
     }
   }
-  return false;
+  return success; 
 }
 
 
-bool Tiff::writeImage(BYTE* buff)
+bool Tiff::open(const std::string& existingFileName, bool setGrayScale)
 {
-  if (mtif)
+  std::string newLineStr = "\x0A";
+  std::string newLineStr2 = "[0x0A]";
+  std::string carriageStr = "\x0D";
+  std::string carriageStr2 = "[0x0D]";
+  if (mValidObject)
   {
-    tsize_t stripSize = mactualWidth*mactualHeight*msamplesPerPixel;
-    TIFFSetField(mtif, TIFFTAG_ROWSPERSTRIP, mactualHeight);
-    tsize_t wroteSize = TIFFWriteEncodedStrip(mtif, 0, (void*) buff, stripSize);
-    if (stripSize == wroteSize)
-    {
-      return true;
-    }
-    else
-    {
-      return false;
-    }
+    tiffCleanup();
+    baseCleanup();
+    tiffClearAttribs();
+    baseClearAttribs();
   }
-  return false;
-}
-
-
-
-bool Tiff::writeDirectory()
-{
-  if (mtif)
+  setFileName(existingFileName);
+  
+  try 
   {
-    return TIFFWriteDirectory(mtif) == 1 ? true : false;
+    mTif = TIFFLIB::TIFFOpen(mFileName.c_str(), "r");
+    if (!mTif) {
+      mErrMsg << "Error opening '" << mFileName << "': ";
+      std::cerr << mErrMsg.str();
+      throw std::runtime_error(mErrMsg.str());
+    }
+    do
+    {
+      uint32_t tifImageWidth = 0, tifImageLength = 0;
+      uint32_t tileWidth = 0, tileLength = 0;
+      uint16_t bitsPerSample = 0, samplesPerPixel = 0;
+      uint32_t rowsPerStrip = 0;
+      uint16_t photometric = 0;
+      uint16_t planarConfig = 0;
+      uint16_t compression = 0;
+      uint32_t tileDepth = 0;
+      uint32_t tileSize = 0;
+      uint32_t imageDepth = 0;
+      uint32_t xRes=0, yRes=0;
+      uint32_t xPos=0, yPos=0;
+      TIFFLIB::tsize_t stripSize = 0;
+      const char * description = 0;
+      std::string description2;
+      unsigned int unpaddedScanlineBytes, paddedScanlineBytes;
+
+      TiffDirAttribs* attribs = new TiffDirAttribs;
+
+      TIFFGetField(mTif, TIFFTAG_COMPRESSION, &compression);
+      TIFFGetField(mTif, TIFFTAG_IMAGEWIDTH, &tifImageWidth);
+      TIFFGetField(mTif, TIFFTAG_IMAGELENGTH, &tifImageLength);  
+      TIFFGetField(mTif, TIFFTAG_BITSPERSAMPLE, &bitsPerSample);
+      TIFFGetField(mTif, TIFFTAG_SAMPLESPERPIXEL, &samplesPerPixel);
+      TIFFGetField(mTif, TIFFTAG_ROWSPERSTRIP, &rowsPerStrip);  
+      TIFFGetField(mTif, TIFFTAG_PHOTOMETRIC, &photometric);
+      TIFFGetField(mTif, TIFFTAG_TILEWIDTH, &tileWidth);
+      TIFFGetField(mTif, TIFFTAG_TILELENGTH, &tileLength);
+      TIFFGetField(mTif, TIFFTAG_TILEDEPTH, &tileDepth);
+      TIFFGetField(mTif, TIFFTAG_PLANARCONFIG, &planarConfig);
+      TIFFGetField(mTif, TIFFTAG_IMAGEDEPTH, &imageDepth);
+      TIFFGetField(mTif, TIFFTAG_IMAGEDESCRIPTION, &description);
+      TIFFGetField(mTif, TIFFTAG_XRESOLUTION, &xRes);
+      TIFFGetField(mTif, TIFFTAG_YRESOLUTION, &yRes);
+      TIFFGetField(mTif, TIFFTAG_XPOSITION, &xPos);
+      TIFFGetField(mTif, TIFFTAG_YPOSITION, &yPos);
+      tileSize = (uint32_t) TIFFTileSize(mTif);
+      unpaddedScanlineBytes = tifImageWidth * samplesPerPixel; 
+      paddedScanlineBytes = unpaddedScanlineBytes;
+      
+      // each row of the bitmap must be aligned at dword boundaries
+      while ((paddedScanlineBytes & 3) != 0) paddedScanlineBytes++;
+      attribs->dirno = mDirCount;
+      attribs->compression = compression;
+      attribs->width = tifImageWidth;
+      attribs->length = tifImageLength;
+      attribs->tileWidth = tileWidth;
+      attribs->tileLength = tileLength;
+      attribs->tileDepth = tileDepth;
+      attribs->tileSize = tileSize;
+      attribs->rowsPerStrip = rowsPerStrip;
+      attribs->samplesPerPixel = samplesPerPixel;
+      attribs->imageDepth = imageDepth;
+      attribs->bitsPerSample = bitsPerSample;
+      attribs->bitCount = bitsPerSample * samplesPerPixel;
+      attribs->photometric = photometric;
+      attribs->planarConfig = planarConfig;
+      attribs->unpaddedScanlineBytes = unpaddedScanlineBytes;
+      attribs->paddedScanlineBytes = paddedScanlineBytes;
+      attribs->bitmapSize = paddedScanlineBytes * tifImageLength;
+      if (planarConfig == 2)
+      {
+        stripSize = TIFFStripSize(mTif);
+      }
+      attribs->stripSize = stripSize;
+      attribs->totalTiles = 0;
+      if (tifImageWidth > 0 && tifImageLength > 0 && tileWidth > 0 && tileLength > 0)
+      {
+        attribs->totalTiles = (int) ceil(tifImageWidth / tileWidth) * (int) ceil(tifImageLength / tileLength);
+      }  
+      attribs->quality = 0;
+      if (description)
+      {
+        description2 = description;
+        attribs->description = description;
+      }
+      else
+      {
+        description2="";
+      }
+      strReplaceAll(description2, newLineStr, newLineStr2);
+      strReplaceAll(description2, carriageStr, carriageStr2);
+      if (mDebugMode)
+      {
+        std::cout << "------------------------------------------------------------";
+        std::cout << std::endl;
+        std::cout << "TiffDirectory=" << mDirCount;
+        std::cout << " ImageWidth=" << tifImageWidth;
+        std::cout << " ImageLength=" << tifImageLength;
+        std::cout << std::endl;
+        std::cout << "BitsPerSample=" << bitsPerSample;
+        std::cout << " SamplesPerPixel=" << samplesPerPixel;
+        std::cout << " ImageDepth=" << imageDepth;
+        std::cout << std::endl;
+        std::cout << "TileWidth=" << tileWidth;
+        std::cout << " TileLength=" << tileLength;
+        std::cout << std::endl;
+        std::cout << "PlanarConfig=" << planarConfig;
+        std::cout << " Photometric=" << photometric;
+        std::cout << std::endl;
+        std::cout << "TileDepth=" << tileDepth;
+        std::cout << " TileSize=" << tileSize;
+        std::cout << " RowsPerStrip=" << rowsPerStrip;
+        std::cout << std::endl;
+        std::cout << "xResolution=" << xRes;
+        std::cout << " yResolution=" << yRes;
+        std::cout << std::endl;
+        std::cout << "xPosition=" << xPos;
+        std::cout << " yPosition=" << yPos;
+        std::cout << std::endl;
+        std::cout << "Image Description: '" << description2 << "'";
+        std::cout << std::endl;
+      }
+      mDir.push_back(attribs);
+      mDirBottomUp.push_back(attribs);
+      mDirCount++;
+    } 
+    while (TIFFReadDirectory(mTif));
+      
+    if (mDirCount > 0) 
+    {
+      std::sort(mDirBottomUp.begin(), mDirBottomUp.end(), AttribSortPyramid());
+      mBaseDirno = mDirBottomUp[0]->dirno;
+      mActualWidth = mDirBottomUp[0]->width;
+      mActualHeight = mDirBottomUp[0]->length;
+      mBitCount = mDirBottomUp[0]->bitCount;
+      mBitmapSize = mDirBottomUp[0]->bitmapSize;
+      if (TIFFSetDirectory(mTif, mBaseDirno) == 1)
+      {
+        mLastDir = mBaseDirno;
+        mLastLevel = 0; 
+        mValidObject = true;
+      }
+      if (mDebugMode)
+      {
+        std::cout << "------------------------------------------------------------";
+        std::cout << std::endl;
+        std::cout << "Levels Sorted:";
+        std::cout << std::endl;
+        std::cout << "------------------------------------------------------------";
+        std::cout << std::endl;
+        std::cout << "TotalLevels=" << mDirCount; 
+        std::cout << " BaseWidth=" << mActualWidth;
+        std::cout << " BaseHeight=" << mActualHeight;
+        std::cout << std::endl;
+        for (int i = 0; i < mDirCount; i++)
+        {
+          std::cout << "Level=" << i;
+          std::cout << " Width=" << mDirBottomUp[i]->width;
+          std::cout << " Height=" << mDirBottomUp[i]->length;
+          std::cout << std::endl;
+          std::string description2 = mDirBottomUp[i]->description;
+          strReplaceAll(description2, newLineStr, newLineStr2);
+          strReplaceAll(description2, carriageStr, carriageStr2);
+          std::cout << "Description='" << description2 << "'";
+          std::cout << std::endl;
+        }
+      }
+    }  
+  } catch (std::bad_alloc &e) {
+    if (mTif) TIFFClose(mTif);
+    mTif = 0;
+    mErrMsg << "Insufficient memory to decompress '" << mFileName;
+    mErrMsg << "' into memory";
+    throw std::runtime_error(mErrMsg.str());
+  } catch (std::runtime_error &e) {
+    if (mTif) TIFFClose(mTif);
+    mTif = 0;
+    return false;
   }
-  return false;
+  return (mDirCount > 0);
 }
 
 
-bool Tiff::setAttributes(int newSamplesPerPixel, int newBitsPerSample, int newImageWidth, int newImageHeight, int newTileWidth, int newTileHeight, int newTileDepth, int quality)
+bool Tiff::read(safeBmp* pDestBmp, int level, int64_t x, int64_t y, int64_t cx, int64_t cy, int64_t *pReadWidth, int64_t *pReadHeight)
 {
-  mactualWidth = newImageWidth;
-  mactualHeight = newImageHeight;
-  mtileWidth = newTileWidth;
-  mtileHeight = newTileHeight;
-  mbitCount = newBitsPerSample;
-  msamplesPerPixel = newSamplesPerPixel;
-  mquality = quality;
-  uint32 u32TifImageWidth = (uint32) newImageWidth;
-  uint32 u32TifImageLength = (uint32) newImageHeight;
-  uint32 u32TileWidth = (uint32) newTileWidth;
-  uint32 u32TileLength = (uint32) newTileHeight;
-  uint32 u32TileDepth = (uint32) newTileDepth;
-  uint16 u16BitsPerSample = (uint16) newBitsPerSample;
-  uint16 u16SamplesPerPixel = (uint16) newSamplesPerPixel;
-  uint16 photometric = PHOTOMETRIC_RGB;
-  uint16 planarConfig = 1;
-//    uint32 totalTilesX = 0, totalTilesY = 0;
-//    uint32 tileSize;
+  safeBmp srcTile;
+  bool success = false;
+  *pReadWidth = 0;
+  *pReadHeight = 0;
+  if (setBottomUpDirectory(level)==false)
+  {
+    return false;
+  }
+  TiffDirAttribs* dirPtr = mDir[mLastDir];
 
-  if (mtif)
+  int64_t imageWidth = dirPtr->width;
+  int64_t imageLength = dirPtr->length;
+  
+  if (cx < 1 || cy < 1) return false;
+  if (x < 0 || y < 0) return false;
+  if (x >= imageWidth || y >= imageLength) return false;
+  int64_t cx2 = cx;
+  int64_t cy2 = cy;
+  if (x+cx > imageWidth)
+  {
+    cx2 = imageWidth - x;
+  }
+  if (y+cy > imageLength)
+  {
+    cy2 = imageLength - y;
+  }
+  switch (dirPtr->photometric) 
+  {
+    case PHOTOMETRIC_RGB:
+    {
+      if (dirPtr->samplesPerPixel != 3 || dirPtr->bitsPerSample != 8) {
+        mErrMsg << "Error decompressing '" << mFileName << "': ";
+        mErrMsg << "Unsupported bit depth in tiff file. Samples per pixel=" << dirPtr->samplesPerPixel << " bits per sample=" << dirPtr->bitsPerSample;
+        throw std::runtime_error(mErrMsg.str());
+      }
+      break;
+    }  
+    case PHOTOMETRIC_PALETTE: 
+    { // color palette
+      mErrMsg << "Error decompressing '" << mFileName << "': ";
+      mErrMsg << "Unsupported palette in tiff file.";
+      throw std::runtime_error(mErrMsg.str());
+      break;
+    }
+    default:
+    {
+      int i = 0;
+      while (mPhotoStrings[i].description != NULL &&
+             mPhotoStrings[i].photometric != dirPtr->photometric)
+      {
+        i++;
+      }
+      std::ostringstream description;
+      if (mPhotoStrings[i].description == NULL)
+          description << dirPtr->photometric;
+      else
+          description << mPhotoStrings[i].description;
+      mErrMsg << "Error decompressing '" << mFileName << "': ";
+      mErrMsg << "Unsupported Tiff file format.\n";
+      mErrMsg << "Tiff files that are encoded using a photometric value of " 
+          << description.str() << " are currently unsupported.";
+      throw std::runtime_error(mErrMsg.str());
+    }
+  }
+  int compression = dirPtr->compression;
+  int tileWidth = dirPtr->tileWidth;
+  int tileLength = dirPtr->tileLength;
+  jp2k_colorspace compressionType = JP2K_RGB;
+
+  if (dirPtr->planarConfig == 2) 
+  {
+    tileLength = dirPtr->rowsPerStrip;
+    tileWidth = imageWidth;
+  }
+  else
+  {
+    if (tileWidth <= 0) tileWidth = 256;
+    if (tileLength <= 0) tileLength = 256;
+  }
+  BYTE* compressedTileBmp = NULL;
+  int uncompressedTileSize = tileWidth * 3 * tileLength;
+  int64_t tilesPerRow = (int64_t) ceil((double)imageWidth/(double)tileWidth);
+  int64_t startx = (x / tileWidth) * tileWidth;
+  int64_t starty = (y / tileLength) * tileLength;
+  int64_t endx = (int64_t) ceil((double)(x+cx2) / (double)tileWidth) * tileWidth;
+  int64_t endy = (int64_t) ceil((double)(y+cy2) / (double)tileLength) * tileLength;
+
+  if (compression == 33003 || compression == 33005)
+  {
+    if (compression == 33003) compressionType = JP2K_YCBCR;
+    compressedTileBmp = new BYTE[uncompressedTileSize];
+  }
+  for (int64_t srcy = starty; srcy < endy; srcy += tileLength) 
+  {
+    int64_t desty = srcy - y;
+    int64_t ycopy = tileLength;
+    int64_t srcy2 = 0;
+    if (y > srcy) 
+    {
+      ycopy += desty;
+      srcy2 = y - srcy;
+      desty = 0;
+    }  
+    for (int64_t srcx = startx; srcx < endx; srcx += tileWidth) 
+    {
+      int64_t destx = srcx - x;
+      int64_t xcopy = tileWidth;
+      int64_t srcx2 = 0;
+      if (x > srcx)
+      {
+        xcopy += destx;
+        srcx2 = x - srcx;
+        destx = 0;
+      }  
+      int64_t bytesRead = 0;
+      int64_t tileNum = ((srcy / tileLength) * tilesPerRow) + (srcx / tileWidth);
+      BYTE* pTileBmp = tileCache.find(this, level, tileNum, &bytesRead);
+      if (pTileBmp == 0)
+      {
+        if (compression == 33003 || compression == 33005)
+        {
+          memset(compressedTileBmp, 255, uncompressedTileSize);
+          bytesRead = (int64_t) TIFFReadRawTile(mTif, (TIFFLIB::ttile_t) tileNum, compressedTileBmp, uncompressedTileSize);
+        }
+        else
+        {
+          pTileBmp = new BYTE[uncompressedTileSize];
+          memset(pTileBmp, 255, uncompressedTileSize);
+          if (dirPtr->planarConfig == 2)
+          {
+            TIFFLIB::tstrip_t stripNum = TIFFComputeStrip(mTif, (uint32_t) srcy, 0);
+            bytesRead = (int64_t) TIFFReadEncodedStrip(mTif, stripNum, pTileBmp, -1); 
+          }
+          else
+          {
+            bytesRead = (int64_t) TIFFReadTile(mTif, pTileBmp, (uint32_t) srcx, (uint32_t) srcy, 0, 0);
+          }
+        }
+        if (bytesRead <= 0)
+        {
+          std::cerr << "Warning: TIFF Read Bytes Read is <= 0." << std::endl;;
+        }
+        else if (bytesRead > uncompressedTileSize)
+        {
+          mErrMsg << "Fatal Error: TIFF Read Bytes Read > Uncompressed Tile Size!" << std::endl;
+          throw std::runtime_error(mErrMsg.str());
+        }
+        if (compression == 33003 || compression == 33005)
+        {
+          pTileBmp = new BYTE[uncompressedTileSize];
+          memset(pTileBmp, 255, uncompressedTileSize);
+          if (bytesRead > 0 && jp2k_decode(pTileBmp, tileWidth, tileLength, compressedTileBmp, (int32_t) bytesRead, compressionType)==false)
+          {
+            std::cerr << "Warning: JPEG2000 decode failed on Tiff Level: " << level << " Tile: " << tileNum << "! Resulting Tile will be all white." << std::endl;
+            bytesRead = 0;
+          }
+        }
+        tileCache.add(this, level, tileNum, uncompressedTileSize, pTileBmp);
+      }
+      if (bytesRead > 0) 
+      {
+        safeBmpInit(&srcTile, pTileBmp, tileWidth, tileLength); 
+        safeBmpCpy(pDestBmp, destx, desty, &srcTile, srcx2, srcy2, xcopy, ycopy);
+        success = true;
+      }
+    }  
+  } 
+  if (compressedTileBmp)
+  {
+    delete[] compressedTileBmp;
+    compressedTileBmp = 0;
+  }
+  if (success)
+  {
+    *pReadWidth = cx;
+    *pReadHeight = cy;
+  }
+  return success;
+}
+
+
+bool Tiff::createFile(const std::string& newFileName)
+{
+  if (mValidObject)
+  {
+    tiffCleanup();
+    baseCleanup();
+    tiffClearAttribs();
+    baseClearAttribs();
+  }
+  setFileName(newFileName);
+    
+  try {
+    mTif = TIFFLIB::TIFFOpen(mFileName.c_str(), "wb8");
+    if (!mTif) {
+      mErrMsg << "Error opening '" << mFileName << "': ";
+      throw std::runtime_error(mErrMsg.str());
+    }
+  } 
+  catch (std::runtime_error &e) 
+  {
+    if (mTif) TIFFClose(mTif);
+    mTif = 0;
+    return false;
+  }
+  return true;
+}
+
+
+bool Tiff::setAttributes(int newSamplesPerPixel, int newBitsPerSample, int64_t newImageWidth, int64_t newImageHeight, int newTileWidth, int newTileHeight, int newTileDepth, int quality)
+{
+  mActualWidth = newImageWidth;
+  mActualHeight = newImageHeight;
+  mTileWidth = newTileWidth;
+  mTileHeight = newTileHeight;
+  mBitCount = newBitsPerSample;
+  mSamplesPerPixel = newSamplesPerPixel;
+  mQuality = quality;
+  uint32_t u32TifImageWidth = (uint32_t) newImageWidth;
+  uint32_t u32TifImageLength = (uint32_t) newImageHeight;
+  uint32_t u32TileWidth = (uint32_t) newTileWidth;
+  uint32_t u32TileLength = (uint32_t) newTileHeight;
+  uint32_t u32TileDepth = (uint32_t) newTileDepth;
+  uint16_t u16BitsPerSample = (uint16_t) newBitsPerSample;
+  uint16_t u16SamplesPerPixel = (uint16_t) newSamplesPerPixel;
+  uint16_t photometric = PHOTOMETRIC_RGB;
+  uint16_t planarConfig = 1;
+
+  if (mTif)
   {
     try 
     {
-      TIFFSetField(mtif, TIFFTAG_IMAGEWIDTH, u32TifImageWidth);
-      TIFFSetField(mtif, TIFFTAG_IMAGELENGTH, u32TifImageLength);  
-      TIFFSetField(mtif, TIFFTAG_BITSPERSAMPLE, u16BitsPerSample);
-      TIFFSetField(mtif, TIFFTAG_SAMPLESPERPIXEL, u16SamplesPerPixel);
-          //TIFFSetField(tif, TIFFTAG_ROWSPERSTRIP, &rowsPerStrip);  
-          //TIFFGetField(tif, TIFFTAG_STRIPBYTECOUNTS, &stripByteCounts);
-      TIFFSetField(mtif, TIFFTAG_PHOTOMETRIC, photometric);
-      if (mtileWidth > 0 && mtileHeight > 0)
+      TIFFSetField(mTif, TIFFTAG_IMAGEWIDTH, u32TifImageWidth);
+      TIFFSetField(mTif, TIFFTAG_IMAGELENGTH, u32TifImageLength);  
+      TIFFSetField(mTif, TIFFTAG_BITSPERSAMPLE, u16BitsPerSample);
+      TIFFSetField(mTif, TIFFTAG_SAMPLESPERPIXEL, u16SamplesPerPixel);
+      TIFFSetField(mTif, TIFFTAG_PHOTOMETRIC, photometric);
+      if (mTileWidth > 0 && mTileHeight > 0)
       {
-        TIFFSetField(mtif, TIFFTAG_TILEWIDTH, u32TileWidth);
-        TIFFSetField(mtif, TIFFTAG_TILELENGTH, u32TileLength);
-        TIFFSetField(mtif, TIFFTAG_TILEDEPTH, u32TileDepth);
+        TIFFSetField(mTif, TIFFTAG_TILEWIDTH, u32TileWidth);
+        TIFFSetField(mTif, TIFFTAG_TILELENGTH, u32TileLength);
+        TIFFSetField(mTif, TIFFTAG_TILEDEPTH, u32TileDepth);
       }
-      TIFFSetField(mtif, TIFFTAG_PLANARCONFIG, planarConfig);
-      TIFFSetField(mtif, TIFFTAG_COMPRESSION, COMPRESSION_JPEG);
-      TIFFSetField(mtif, TIFFTAG_JPEGQUALITY, quality);    
-      TIFFSetField(mtif, TIFFTAG_JPEGCOLORMODE, JPEGCOLORMODE_RGB);
+      TIFFSetField(mTif, TIFFTAG_PLANARCONFIG, planarConfig);
+      TIFFSetField(mTif, TIFFTAG_COMPRESSION, COMPRESSION_JPEG);
+      TIFFSetField(mTif, TIFFTAG_JPEGQUALITY, quality);    
+      TIFFSetField(mTif, TIFFTAG_JPEGCOLORMODE, JPEGCOLORMODE_RGB);
     }
     catch (std::bad_alloc &e) 
     {
-      if (mtif) TIFFClose(mtif);
-      merrMsg << "Insufficient memory to decompress '" << mfileName;
-      merrMsg << "' into memory";
-      mtif = 0;
-      return false;
+      if (mTif) TIFFClose(mTif);
+      mTif = 0;
+      mErrMsg << "Insufficient memory to decompress '" << mFileName;
+      mErrMsg << "' into memory";
+      throw std::runtime_error(mErrMsg.str());
     } 
     catch (std::runtime_error &e) 
     {
-      if (mtif) TIFFClose(mtif);
-      mtif = 0;
+      if (mTif) TIFFClose(mTif);
+      mTif = 0;
       return false;
     }
- }
+  }
   else
   {
     return false;
@@ -167,22 +643,66 @@ bool Tiff::setAttributes(int newSamplesPerPixel, int newBitsPerSample, int newIm
 }
 
 
+bool Tiff::writeEncodedTile(BYTE* buff, int64_t x, int64_t y, int64_t z)
+{
+  bool success = false;
+  if (mTif)
+  {
+    TIFFLIB::ttile_t tile = TIFFComputeTile(mTif, (uint32_t) x, (uint32_t) y, (uint32_t) z, 0);
+    TIFFLIB::tsize_t saved = TIFFWriteEncodedTile(mTif, tile, (TIFFLIB::tdata_t) buff, (TIFFLIB::tsize_t) (mTileWidth*mTileHeight*mSamplesPerPixel));
+    if (saved==(mTileWidth*mTileHeight*mSamplesPerPixel))
+    {
+      success= true;
+    }
+  }
+  return success;
+}
+
+
+bool Tiff::writeImage(BYTE* buff)
+{
+  bool success = false;
+  if (mTif)
+  {
+    TIFFLIB::tsize_t stripSize = mActualWidth*mActualHeight*mSamplesPerPixel;
+    TIFFSetField(mTif, TIFFTAG_ROWSPERSTRIP, mActualHeight);
+    TIFFLIB::tsize_t wroteSize = TIFFWriteEncodedStrip(mTif, 0, (void*) buff, stripSize);
+    if (stripSize == wroteSize)
+    {
+      success=true;
+    }
+  }
+  return success;
+}
+
+
+bool Tiff::writeDirectory()
+{
+  bool success = false;
+  if (mTif)
+  {
+    success = (TIFFWriteDirectory(mTif) == 1) ? true : false;
+  }
+  return success;
+}
+
+
 bool Tiff::setDescription(std::string& strAttributes, int baseWidth, int baseHeight)
 {
   std::ostringstream oss;
   int retval=0;
-  if (mtif)
+  if (mTif)
   {
     oss << "Aperio Image" << "\r\n";
     oss << baseWidth << "x" << baseHeight << " ";
-    if (mtileWidth > 0 && mtileHeight > 0)
+    if (mTileWidth > 0 && mTileHeight > 0)
     {
-      oss << "(" << mtileWidth << "x" << mtileHeight << ") ";
+      oss << "(" << mTileWidth << "x" << mTileHeight << ") ";
     }
-    oss << "-> " << mactualWidth << "x" << mactualHeight;
-    if (mtileWidth > 0 && mtileHeight > 0)
+    oss << "-> " << mActualWidth << "x" << mActualHeight;
+    if (mTileWidth > 0 && mTileHeight > 0)
     {
-      oss << " JPEG/RGB Q=" << mquality;
+      oss << " JPEG/RGB Q=" << mQuality;
     }
     else
     {
@@ -190,7 +710,7 @@ bool Tiff::setDescription(std::string& strAttributes, int baseWidth, int baseHei
     }
     oss << strAttributes;
     std::string attr = oss.str();
-    retval=TIFFSetField(mtif, TIFFTAG_IMAGEDESCRIPTION, attr.c_str());
+    retval=TIFFSetField(mTif, TIFFTAG_IMAGEDESCRIPTION, attr.c_str());
   }
   return (retval == 1 ? true : false);
 }
@@ -198,294 +718,10 @@ bool Tiff::setDescription(std::string& strAttributes, int baseWidth, int baseHei
 
 bool Tiff::setThumbNail()
 {
-  if (mtif)
+  if (mTif)
   {
-    TIFFSetField(mtif, TIFFTAG_SUBFILETYPE, FILETYPE_REDUCEDIMAGE);
+    TIFFSetField(mTif, TIFFTAG_SUBFILETYPE, FILETYPE_REDUCEDIMAGE);
     return true;
   }
   return false;
 }
-
-
-bool Tiff::createFile(const std::string& newFileName)
-{
-  if (mValidObject)
-    cleanup();
-  mValidObject = false;
-  mtif = 0;
-  mquality = 70;
-  setFileName(newFileName);
-    
-  try {
-    mtif = TIFFOpen(mfileName.c_str(), "wb8");
-    if (!mtif) {
-      merrMsg << "Error opening '" << mfileName << "': ";
-      throw std::runtime_error(merrMsg.str());
-    }
-  } 
-  catch (std::runtime_error &e) 
-  {
-    if (mtif) TIFFClose(mtif);
-    mtif = 0;
-    return false;
-  }
-  return true;
-}
-
-
-bool Tiff::load(const std::string& newFileName)
-{
-  unsigned int unpaddedScanlineBytes, paddedScanlineBytes;
-  uint32 tifImageWidth = 0, tifImageLength = 0;
-  uint32 tileWidth = 0, tileLength = 0;
-  uint16 bitsPerSample = 0, samplesPerPixel = 0;
-  uint32 rowsPerStrip = 0;
-  //uint32 stripByteCounts = 0;
-  uint16 photometric = 0;
-  uint16 planarConfig = 0;
-  uint32 tileDepth = 0;
-  //uint32 totalTilesX = 0, totalTilesY = 0;
-  uint32 tileSize;
-  uint32 subFileType=0;
-  uint32 osubFileType=0;
-  uint32 subIFD=0;
-  uint32 fullLength=0;
-  uint32 fullWidth=0;
-  uint32 xres=0, yres=0;
-  uint32 xpos=0, ypos=0;
-  uint32 imageDepth = 0;
-  char* description = 0;
-
-  /*struct { uint16 photometric; char const* description; } photostrings[] = { 
-    { PHOTOMETRIC_MINISWHITE, "Minimal is White" },
-    { PHOTOMETRIC_MINISBLACK, "Minimal is Black" },
-    { PHOTOMETRIC_MASK, "Hold Mask" },
-    { PHOTOMETRIC_SEPARATED, "Color Separated" },
-    { PHOTOMETRIC_YCBCR, "YCBCR/CCIR 601" },
-    { PHOTOMETRIC_CIELAB, "CIE Lab" },
-    { PHOTOMETRIC_ICCLAB, "ICC Lab" },
-    { PHOTOMETRIC_ITULAB, "ITU Lab" },
-    { PHOTOMETRIC_LOGL, "CIE Log2(L)" },
-    { PHOTOMETRIC_LOGLUV, "CIE Log2(L) (u', v')" },
-    { 0, NULL }
-  };*/
-
-  //if (mValidObject)
-  //    cleanup();
-  mValidObject = false;
-  mtif = 0;
-  setFileName(newFileName);
-  printf("Opening tiff file %s...\n", mfileName.c_str());
-  
-  merrMsg.str("");
- try 
-  {
-    mtif = TIFFOpen(mfileName.c_str(), "r");
-    if (!mtif) {
-      merrMsg << "Error opening '" << mfileName << "': ";
-      printf("%s\n", merrMsg.str().c_str());
-      throw std::runtime_error(merrMsg.str());
-    }
-
-    int dirCount = 0;
-    do
-    {
-      TIFFGetField(mtif, TIFFTAG_IMAGEWIDTH, &tifImageWidth);
-      TIFFGetField(mtif, TIFFTAG_IMAGELENGTH, &tifImageLength);  
-      TIFFGetField(mtif, TIFFTAG_BITSPERSAMPLE, &bitsPerSample);
-      TIFFGetField(mtif, TIFFTAG_SAMPLESPERPIXEL, &samplesPerPixel);
-      TIFFGetField(mtif, TIFFTAG_ROWSPERSTRIP, &rowsPerStrip);  
-      //TIFFGetField(mtif, TIFFTAG_STRIPBYTECOUNTS, &stripByteCounts);
-      TIFFGetField(mtif, TIFFTAG_PHOTOMETRIC, &photometric);
-      TIFFGetField(mtif, TIFFTAG_TILEWIDTH, &tileWidth);
-      TIFFGetField(mtif, TIFFTAG_TILELENGTH, &tileLength);
-      TIFFGetField(mtif, TIFFTAG_TILEDEPTH, &tileDepth);
-      TIFFGetField(mtif, TIFFTAG_PLANARCONFIG, &planarConfig);
-      TIFFGetField(mtif, TIFFTAG_SUBFILETYPE, &subFileType);
-      TIFFGetField(mtif, TIFFTAG_OSUBFILETYPE, &osubFileType);
-      TIFFGetField(mtif, TIFFTAG_SUBIFD, &subIFD);
-      TIFFGetField(mtif, TIFFTAG_PIXAR_IMAGEFULLWIDTH, &fullWidth);
-      TIFFGetField(mtif, TIFFTAG_PIXAR_IMAGEFULLLENGTH, &fullLength);
-      TIFFGetField(mtif, TIFFTAG_XRESOLUTION, &xres);
-      TIFFGetField(mtif, TIFFTAG_YRESOLUTION, &yres);
-      TIFFGetField(mtif, TIFFTAG_XPOSITION, &xpos);
-      TIFFGetField(mtif, TIFFTAG_YPOSITION, &ypos);
-      TIFFGetField(mtif, TIFFTAG_IMAGEDEPTH, &imageDepth);
-      toff_t dir_offset=0;
-      TIFFGetField(mtif, TIFFTAG_EXIFIFD, &dir_offset);
-      //int descRet=TIFFGetField(mtif, TIFFTAG_IMAGEDESCRIPTION, &description);
-      if (dir_offset != 0)
-      {
-          //TIFFReadEXIFDirectory(mtif, dir_offset);
-      }
-      toff_t custom_offset=0;
-      TIFFGetField(mtif, TIFFTAG_SUBIFD, &custom_offset);
-      /*TIFFFieldArray infoarray;
-      memset(&infoarray, 0, sizeof(infoarray));
-      if (custom_offset != 0)
-      {
-          TIFFReadCustomDirectory(mtif, custom_offset, infoarray);
-      }
-      */
-      tileSize = (uint32) TIFFTileSize(mtif);
-      mactualWidth = tifImageWidth;
-      mactualHeight = tifImageLength;
-      calcRenderedDims();
-      mbitCount = bitsPerSample * samplesPerPixel;
-      // number of bytes in one line
-      unpaddedScanlineBytes = mactualWidth * samplesPerPixel; 
-      printf("scanline size: mine %i tifflib %i\n", unpaddedScanlineBytes,
-              (int) TIFFScanlineSize(mtif));
-      paddedScanlineBytes = unpaddedScanlineBytes;
-      
-      // each row of the bitmap must be aligned at dword boundaries
-      while ((paddedScanlineBytes & 3) != 0) paddedScanlineBytes++;
-  
-      printf("tiffDirectory %i\n", dirCount);
-      printf("actualWidth %i actualHeight %i bitsPerSample %i samplesPerPixel"
-              " %i tileWidth %i tileHeight %i\n",
-          mactualWidth, mactualHeight, (int) bitsPerSample, (int) samplesPerPixel,
-          tileWidth, tileLength);
-      printf("rowsPerStrip %i photometric %i\n", (int) rowsPerStrip, 
-          (int) photometric);
-      printf("tileDepth %i tileSize %i planarConfig %i\n", (int) tileDepth, (int) tileSize, (int) planarConfig);
-      printf("Custom Offset %i SubfileType %i OSubFileType %i SubIFD %i xRes %i yRes %i xPos %i yPos %i Image Depth %i", (int) custom_offset, (int) subFileType, osubFileType, subIFD, xres, yres, xpos, ypos, imageDepth);
-      if (description != NULL) printf("Image Description: %s", description);
-      printf("\n");
-      dirCount++;
-      } 
-      while (TIFFReadDirectory(mtif));
-      TIFFSetDirectory(mtif, dirCount-1);
-
-      mbitmapSize = paddedScanlineBytes * mactualHeight;
-//        pBitmap = new BYTE[bitmapSize];
-
-/*
-      switch (photometric) {
-      case PHOTOMETRIC_RGB:
-          if (samplesPerPixel != 3 || bitsPerSample != 8) {
-              errMsg << "Error decompressing '" << fileName << "': ";
-              errMsg << "Unsupported bit depth in tiff file.";
-              throw std::runtime_error(errMsg.str());
-          }
-          break;
-      case PHOTOMETRIC_PALETTE: { // color palette
-          uint16 *red, *green, *blue;
-          unsigned int paletteSize = 1 << bitsPerSample;
-          TIFFGetField(tif, TIFFTAG_COLORMAP, &red, &green, &blue);
-          bool palette16bits = (colorMapBitCount
-                              (paletteSize, red, green, blue)
-                              == 16 ? true : false);
-          for (unsigned int i = 0; i < paletteSize; i++) {
-          }
-          break;
-      }
-      default:
-          int i = 0;
-          while (photostrings[i].description != NULL &&
-                 photostrings[i].photometric != photometric) {
-              i++;
-          }
-          std::ostringstream description;
-          if (photostrings[i].description == NULL)
-              description << photometric;
-          else
-              description << photostrings[i].description;
-          errMsg << "Error decompressing '" << fileName << "': ";
-          errMsg << "Unsupported Tiff file format.\n";
-          errMsg << "Tiff files that are encoded using a photometric value of " 
-              << description << " are currently unsupported.";
-          throw std::runtime_error(errMsg.str());
-      }
-      if (tileWidth > 1 && tileLength > 0) 
-      {
-          totalTilesX = tifImageWidth / tileWidth;
-          totalTilesY = tifImageLength / tileLength;
-          std::vector<BYTE> sampleTile(tileSize);
-           
-          for (int srcy = 0; srcy < tifImageLength; srcy += tileLength) 
-          {
-              for (int srcx = 0; srcx < tifImageWidth; srcx += tileWidth) 
-              {
-                  int bytes_read = TIFFReadTile(tif, &sampleTile[0], srcx, srcy, 0, 0);
-                  if (bytes_read == -1) 
-                  {
-                      memset(&sampleTile[0], 0, tileSize);
-                  }
-
-                  for (int desty = srcy; desty >= 0 && desty < (srcy + tileLength) && desty < tifImageLength; desty++)
-                  {
-                      //bytes_read / samplesPerPixel / tileWidth)
-                      int pixelCount = tileWidth; 
-                      if (srcx + tileWidth > tifImageWidth)
-                      {
-                          pixelCount = tileWidth - (srcx + tileWidth - tifImageWidth);
-                          if (pixelCount < 0) pixelCount = 0;
-                      }
-                          
-                      BYTE *dest = &pBitmap[desty*paddedScanlineBytes+(srcx*samplesPerPixel)];
-                      BYTE *src = &sampleTile[(tileWidth * (desty - srcy) * samplesPerPixel)];
-                      memcpy(dest, src, pixelCount * samplesPerPixel);
-                      if (srcx + tileWidth >= tifImageWidth)
-                      {
-                          dest = &pBitmap[(desty*paddedScanlineBytes) - (paddedScanlineBytes - unpaddedScanlineBytes)];
-                          memset(dest, 0, paddedScanlineBytes - unpaddedScanlineBytes);
-                      }
-                  }
-              }       
-          } 
-      }
-      else 
-      {
-          std::vector<BYTE> sampleStrip(TIFFStripSize(tif));
-          for (unsigned int row = 0; row < actualHeight; row += rowsPerStrip) {
-              int rowsToRead = (row + rowsPerStrip > actualHeight ? 
-                                actualHeight - row : rowsPerStrip);
-              if (TIFFReadEncodedStrip(tif, TIFFComputeStrip(tif, row, 0),
-                                       &sampleStrip[0], 
-                                       -1) // rowsToRead*unpaddedScanlineBytes) 
-                                       == -1)
-              {
-                  errMsg << "Error decompressing '" << fileName << "'";
-                  throw std::runtime_error(errMsg.str());
-              } else {
-                  for (int rowToCopy = 0; rowToCopy < rowsToRead; rowToCopy++) {
-  //                  BYTE *dest = &pBitmap[(actualHeight*paddedScanlineBytes)-
-  //                                        ((row+rowToCopy+1)*paddedScanlineBytes)]; */
-/*                        BYTE *dest = &pBitmap[(row+rowToCopy)*paddedScanlineBytes];
-                      BYTE *src = &sampleStrip[rowToCopy*unpaddedScanlineBytes];
-                      if (samplesPerPixel == 3 && bitsPerSample == 8) {
-                          unsigned int i;
-                          for (i = 0; i < unpaddedScanlineBytes; 
-                               i += 3) {
-                              dest[i] = src[i+2];
-                              dest[i+1] = src[i+1];
-                              dest[i+2] = src[i+0];
-                          }
-                          while (i < paddedScanlineBytes) {
-                              dest[i] = 0;
-                              i++;
-                          }
-                      }
-                  }
-              }
-          }
-      }
-*/
-    TIFFClose(mtif);
-    mtif = 0;
-    mValidObject = true;
-  } catch (std::bad_alloc &e) {
-    if (mtif) TIFFClose(mtif);
-    mtif = 0;
-    merrMsg << "Insufficient memory to decompress '" << mfileName;
-    merrMsg << "' into memory";
-    return false;
-  } catch (std::runtime_error &e) {
-    if (mtif) TIFFClose(mtif);
-    mtif = 0;
-    return false;
-  }
-  return true;
-}
-

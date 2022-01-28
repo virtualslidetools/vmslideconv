@@ -19,9 +19,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 *******************************************************************************/
-
-#ifndef JPGSUPPORT_H
-#define JPGSUPPORT_H
+#ifndef __JPGSUPPORT_FILE_H
+#define __JPGSUPPORT_FILE_H
 
 #include <cstdio>
 
@@ -31,26 +30,24 @@ extern "C" {
 }
 
 #include "imagesupport.h"
+#include "safebmp.h"
 
 class Jpg : public Image {
 protected:
-  unsigned int munpaddedScanlineBytes;	/* row width without padding */
-  bool mfullReadDone;
-  BYTE* mpFullBitmap;
+  safeBmp mFullSrc;
 public:
-  bool load(const std::string& newFileName);
-  bool read(int x, int y, int width, int height, bool setGrayScale = false);
-  bool unbufferedRead(int x, int y, int width, int height);
-  bool open(const std::string& newFileName, int orientation = 0, bool setGrayScale = false);
-  void close();
-  void initialize();
-  Jpg() : Image() { initialize(); }
-  ~Jpg() { close(); }
+  Jpg() { jpgClearAttribs(); }
+  virtual ~Jpg() { jpgCleanup(); }
+  void jpgClearAttribs();
+  void jpgCleanup();
+  bool open(const std::string& newFileName, bool setGrayScale = false);
+  bool read(safeBmp* pBmpDest, int64_t x, int64_t y, int64_t width, int64_t height);
+  void close() { jpgCleanup(); baseCleanup(); jpgClearAttribs(); baseClearAttribs(); }
   static bool testHeader(BYTE*, int);
 };
 
-bool my_jpeg_write(std::string& newFileName, BYTE *pFullBitmap, int width, int height, int quality, std::string* perrMsg);
-bool my_jpeg_compress(BYTE** ptpCompressedBitmap, BYTE *pFullBitmap, int width, int height, int quality, std::string* perrMsg, unsigned long *pOutSize);
+bool my_jpeg_write(std::string& newFileName, BYTE *pFullBitmap, int64_t width, int64_t height, int quality, std::string* perrMsg);
+bool my_jpeg_compress(BYTE** ptpCompressedBitmap, BYTE *pFullBitmap, int64_t width, int64_t height, int quality, std::string* perrMsg, unsigned long *pOutSize);
 void my_jpeg_free(BYTE** ptpCompressedBitmap);
 
 #endif

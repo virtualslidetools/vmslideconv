@@ -1,4 +1,6 @@
-#ifndef __CONSOLE_UNIX__
+#ifndef __CONSOLE_UNIX_FILE_H
+#define __CONSOLE_UNIX_FILE_H
+
 #include <iostream>
 #include <cerrno>
 #include <cstring>
@@ -7,4 +9,5 @@
 void retractCursor();
 
 bool platform_mkdir(std::string name, std::string* perror);
+
 #endif

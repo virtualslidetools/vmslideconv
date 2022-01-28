@@ -127,11 +127,11 @@ int ZipFile::addDir(std::string name)
   }
   #ifdef zipOpenNewFileInZip_64
   status = zipOpenNewFileInZip_64(mZipArchive, nameWithSlash.c_str(), 
-    &zinfo, NULL, 0, NULL, 0, NULL, OLY_DEFAULT_COMPRESS_METHOD, 0, 
+    &zinfo, NULL, 0, NULL, 0, NULL, OLY_DEF_COMPRESS_METHOD, 0, 
     0); 
   #else
   status = zipOpenNewFileInZip4_64(mZipArchive, nameWithSlash.c_str(), 
-    &zinfo, NULL, 0, NULL, 0, NULL, OLY_DEFAULT_COMPRESS_METHOD, 0, 
+    &zinfo, NULL, 0, NULL, 0, NULL, OLY_DEF_COMPRESS_METHOD, 0, 
     0, 0, 0, 0, NULL, 0, OLY_ZIP_VERSION_MADE_BY, 0, 
     0); 
   #endif

@@ -1,5 +1,5 @@
-#ifndef __CMDOPTIONS_H__
-#define __CMDOPTIONS_H__
+#ifndef __CMDOPTIONS_FILE_H
+#define __CMDOPTIONS_FILE_H
 #include <iostream>
 
 class CmdOptions

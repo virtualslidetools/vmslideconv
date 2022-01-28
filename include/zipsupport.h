@@ -1,12 +1,11 @@
-#ifndef __ZIP_SUPPORT_H
-#define __ZIP_SUPPORT_H
-#include <cstdint>
+#ifndef __ZIPSUPPORT_FILE_H
+#define __ZIPSUPPORT_FILE_H
 #ifdef OLY_USE_MZ_VER2
 #include <mz.h>
 #include <mz_compat.h>
 #include <mz_os.h>
-#define OLY_DEFAULT_COMPRESS_METHOD MZ_COMPRESS_METHOD_STORE
-#define OLY_DEFAULT_COMPRESS_LEVEL  MZ_COMPRESS_LEVEL_DEFAULT
+#define OLY_DEF_COMPRESS_METHOD     MZ_COMPRESS_METHOD_STORE
+#define OLY_DEF_COMPRESS_LEVEL      MZ_COMPRESS_LEVEL_DEFAULT
 #define OLY_ZIP_VERSION_MADE_BY     MZ_VERSION_MADEBY 
 #define OLY_ZIP_OK                  MZ_OK
 #ifdef APPEND_STATUS_CREATE
@@ -15,10 +14,10 @@
 #define OLY_APPEND_STATUS_CREATE    0
 #endif
 #else
-#include <zlib.h>
-#include <zip.h>
-#define OLY_DEFAULT_COMPRESS_METHOD Z_NO_COMPRESSION
-#define OLY_DEFAULT_COMPRESS_LEVEL  Z_DEFAULT_STRATEGY
+#include "zlib.h"
+#include "zip.h"
+#define OLY_DEF_COMPRESS_METHOD     Z_NO_COMPRESSION
+#define OLY_DEF_COMPRESS_LEVEL      Z_DEFAULT_STRATEGY
 #define OLY_ZIP_VERSION_MADE_BY     1
 #define OLY_ZIP_OK                  Z_OK
 #define OLY_APPEND_STATUS_CREATE    APPEND_STATUS_CREATE
@@ -42,9 +41,10 @@
 
 #include <vector>
 #include <string>
+#include <cstdint>
 
 #ifndef BYTE
-#define BYTE unsigned char
+typedef uint8_t BYTE;
 #endif
 
 class ZipFile

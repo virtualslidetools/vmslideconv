@@ -1,4 +1,5 @@
-#ifndef __GETOPT_H__
+#ifndef __GETOPT_FILE_H
+#define __GETOPT_FILE_H
 /**
  * DISCLAIMER
  * This file is part of the mingw-w64 runtime package.

@@ -6,7 +6,7 @@
 bool CompositeSlide::drawBorder(BYTE *pBmp, int samplesPerPixel, int64_t x, int64_t y, int64_t width, int64_t height, int level)
 {
   if (checkLevel(level)==false) return false;
-  IniConf *pHigherConf=mConf[level];
+  JpgIniConf *pHigherConf=mEtc[level];
   const int default_thickness=8;
   //std::ofstream logFile("drawBorder.log", std::ios::out | std::ofstream::app);
   
@@ -15,7 +15,7 @@ bool CompositeSlide::drawBorder(BYTE *pBmp, int samplesPerPixel, int64_t x, int6
   int srcLevel=-1;
   for (int curLevel=level-1; curLevel>=0 && srcLevel==-1; curLevel--)
   {
-    if (mConf[curLevel]->mFound)
+    if (mEtc[curLevel]->mFound)
     {
       srcLevel=curLevel;
     }
@@ -24,7 +24,7 @@ bool CompositeSlide::drawBorder(BYTE *pBmp, int samplesPerPixel, int64_t x, int6
   {
     return false;
   }
-  IniConf *pLowerConf=mConf[srcLevel];
+  JpgIniConf *pLowerConf=mEtc[srcLevel];
 
   double xZoomOut = pHigherConf->mxAdj / pLowerConf->mxAdj;
   double yZoomOut = pHigherConf->myAdj / pLowerConf->myAdj;

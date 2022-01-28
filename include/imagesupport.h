@@ -19,21 +19,21 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 *******************************************************************************/
-
-#ifndef IMAGE_FILE_H
-#define IMAGE_FILE_H
+#ifndef __IMAGESUPPORT_FILE_H
+#define __IMAGESUPPORT_FILE_H
 
 #include <string>
 #include <sstream>
 #include <vector>
 #include <cmath>
+#include <cstdint>
 
 #ifndef uint
 typedef unsigned int uint;
 #endif
 
 #ifndef BYTE
-typedef unsigned char BYTE;
+typedef uint8_t BYTE;
 #endif
 
 // Visual C++ 2005 and below does not contain lroundf
@@ -55,68 +55,35 @@ int dprintf(const char* format, ...);
 
 class Image {
 protected:
-  int mactualWidth, mactualHeight, mbitCount;
-  int msamplesPerPixel;
-  double mrenderedWidth, mrenderedHeight;
-  bool mupsideDown;
-  int mshiftRight, mshiftDown;
-  int mpageWidth, mpageHeight;
-  int mlevel;
-  int mreadWidth, mreadHeight;
+  int64_t mActualWidth, mActualHeight;
+  int mBitCount;
+  int mSamplesPerPixel;
+  int mLevel;
+  int64_t mReadWidth, mReadHeight;
   bool mValidObject;
-  std::string mfileName;
-  std::vector<BYTE> minfo;
-  int mbitmapSize;
-  BYTE *mpBitmap;
-  int mrotation;
-  double mzoomPercentage;
-  void setFileName(const std::string& newFileName) 
-  { mfileName = newFileName; }
-  BYTE mbkgColor;
+  std::string mFileName;
+  std::vector<BYTE> mInfo;
+  int64_t mBitmapSize;
+  BYTE mBkgColor;
   bool mGrayScale;
 public:
-  std::ostringstream merrMsg;
-  bool mmaintainAspectRatio, mfitToWindow;
-  std::string getFileName() { return mfileName; }
-  BYTE* bitmapPointer() { return mpBitmap; }
-  void alignBytes();
-  virtual bool open(const std::string& newFileName, int orientation = 0, bool setGrayScale = false) = 0;
-  virtual bool read(int x, int y, int width, int height, bool setGrayScale = false) = 0;
-  bool setZoomPercentage(double);
-  double getZoomPercentage() { return mzoomPercentage; }
-  bool writeBmp(char*);
-  bool rotateCW();
-  bool rotateCCW();
-  bool rotateAlgorithm1();
-  bool rotateAlgorithm2();
-  bool rotate24bitCW(); // not used anymore 
-  bool rotate24bitCCW(); // not used anymore
-  void calcRenderedDims();
-  void resetRenderedDims();
-  int getSamplesPerPixel() { return msamplesPerPixel; }
-  int getActualWidth()  { return (mValidObject) ? mactualWidth : 0; }
-  int getActualHeight() { return (mValidObject) ? mactualHeight : 0; }
-  int getRenderedWidth() { return (mValidObject) ? (uint) mrenderedWidth : 0; }
-  int getRenderedHeight() { return (mValidObject) ? (uint) mrenderedHeight : 0; }
-  void autoUpdatePageValues(int hWnd);
-  void setupPageValues(int winWidth, int winHeight);
-  void setShiftDownPt(int y);
-  void setShiftRightPt(int x);
-  int getShiftDownPt() { return (mValidObject) ? mshiftDown : 0; }
-  int getShiftRightPt() { return (mValidObject) ? mshiftRight : 0; }
-  void setPageWidth(int width);
-  void setPageHeight(int height);
-  int getPageWidth() { return (mValidObject) ? mpageWidth : 0; }
-  int getPageHeight() { return (mValidObject) ? mpageHeight : 0; }
-  int getReadWidth() { return (mValidObject) ? mreadWidth : 0; }
-  int getReadHeight() { return (mValidObject) ? mreadHeight : 0; }
+  std::ostringstream mErrMsg;
+public:
+  Image() { baseClearAttribs(); }
+  virtual ~Image() { baseCleanup(); }
+  void baseClearAttribs();
+  void baseCleanup();
+  void setFileName(const std::string& newFileName) { mFileName = newFileName; }
+  std::string getFileName() { return mFileName; }
+  virtual bool open(const std::string& newFileName, bool setGrayScale = false) = 0;
+  int getSamplesPerPixel() { return mSamplesPerPixel; }
+  int64_t getActualWidth()  { return (mValidObject) ? mActualWidth : 0; }
+  int64_t getActualHeight() { return (mValidObject) ? mActualHeight : 0; }
+  int64_t getReadWidth() { return (mValidObject) ? mReadWidth : 0; }
+  int64_t getReadHeight() { return (mValidObject) ? mReadHeight : 0; }
   bool isValidObject() { return mValidObject; }
-  void cleanup();
-  void getErrMsg(std::string& errStr) { errStr = merrMsg.str(); }
-  int paint(int, int, int, int, int);
-  Image();
-  virtual ~Image();
-  void setUnfilledColor(BYTE newColor) { mbkgColor = newColor; }
+  void getErrMsg(std::string& errStr) { errStr = mErrMsg.str(); }
+  void setUnfilledColor(BYTE newColor) { mBkgColor = newColor; }
   bool getGrayScale() { return mGrayScale; }
 };
 
@@ -125,12 +92,9 @@ Image* loadImage(const char* fileName, std::string& errStr);
 class DummyImage : public Image {
 public:
   bool open(const std::string&) { return false; }
-  bool read(int, int, int, int) { return false; }
-  bool loadAndScale(const std::string&, int, int) 
-  { return false; }
   void cleanup() { }
   DummyImage() { mValidObject = false; }
   ~DummyImage() { } 
 };
 
-#endif // IMAGE_FILE_H
+#endif // __IMAGESUPPORT_FILE_H

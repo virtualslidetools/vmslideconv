@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.0)
 
-if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
-  set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
-endif()
-project( olyvslideconv LANGUAGES C CXX )
+#if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+#  set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
+#endif()
+project( vmslideconv LANGUAGES C CXX )
 
 if (CMAKE_TOOLCHAIN_FILE)
   include(${CMAKE_TOOLCHAIN_FILE})
@@ -23,10 +23,12 @@ else()
   find_package(ZLIB)
 endif()
 
-if (NOT MSVC AND ${CMAKE_CXX_COMPILER_ID} MATCHES "GNU")
+if (MSVC)
+  target_compile_options(${TARGET_NAME} PRIVATE /W4 /WX)  
+elseif (${CMAKE_CXX_COMPILER_ID} MATCHES "GNU")
   find_package(PkgConfig)
-  set(CMAKE_CXX_FLAGS_DEBUG "-g -pg -O0 -Wall")
-  set(CMAKE_CXX_FLAGS_RELEASE "-g -O3 -Wall")
+  set(CMAKE_CXX_FLAGS_DEBUG "-g -pg -O0 -Wall -Wextra -Wpedantic")
+  set(CMAKE_CXX_FLAGS_RELEASE "-g -O3 -Wall -Wextra -Wpedantic")
 endif()
 
 if (NOT MINIZIP_INCLUDE_DIRS AND PKG_CONFIG_FOUND)
@@ -36,16 +38,29 @@ if (NOT MINIZIP_INCLUDE_DIRS AND PKG_CONFIG_FOUND)
     add_definitions(-DOLY_USE_MZ_VER2=1)
     set(OLY_USE_MZ_VER2 "1")
   else()
-    if ("${MINIZIP_VERSION}" MATCHES "^2")
+    message("Minizip version=${MINIZIP_VERSION}")
+    if ("${MINIZIP_VERSION}" MATCHES "^1")
+      message("Minizip version 1 detected.")
+    elseif ("${MINIZIP_VERSION}" MATCHES "^2")
       add_definitions(-DOLY_USE_MZ_VER2=1)
       set(OLY_USE_MZ_VER2 "1")
+    elseif ("${MINIZIP_VERSION}" MATCHES "^3")
+      add_definitions(-DOLY_USE_MZ_VER2=1)
+      set(OLY_USE_MZ_VER2 "1")
+      # glitch in minizip 3.0.2, no include directory set
+      set(MINIZIP_INCLUDE_DIRS "/usr/include/minizip")
     endif()
   endif()
 endif()
 
-if (NOT MINIZIP_INCLUDE_DIRS)
-	message(FATAL_ERROR "Minzip library version 1 or 2 not found!")
+if (NOT MINIZIP_LIBRARIES)
+	message(FATAL_ERROR "Minzip library version 1,2 or 3 not found!")
 endif()
+
+if (NOT MINIZIP_INCLUDE_DIRS)
+	message(FATAL_ERROR "Minzip include dir version 1,2 or 3 not found!")
+endif()
+
 
 if (OLY_USE_MZ_VER2)
   set(OLY_MINIZIP_FILE "mz_compat.h")
@@ -80,6 +95,7 @@ option(USE_OPENCV "Use OpenCV for image processing instead of ImageMagick." ON)
 
 find_package(JPEG)
 find_package(TIFF)
+find_package(OpenJPEG)
 find_package(Threads)
 if (USE_MAGICK)
 	find_package(ImageMagick COMPONENTS MagickCore MagickWand)
@@ -106,6 +122,15 @@ elseif (PKG_CONFIG_FOUND)
   pkg_check_modules(LIBTIFF REQUIRED libtiff-4)
 else()
   message(FATAL_ERROR "LibTiff not found!")
+endif()
+
+if (OPENJPEG_FOUND)
+  set (LIBOPENJPEG_LIBRARIES ${OPENJPEG_LIBRARIES})
+  set (LIBOPENJPEG_INCLUDE_DIRS ${OPENJPEG_INCLUDE_DIRS})
+elseif (PKG_CONFIG_FOUND)
+  pkg_check_modules(LIBOPENJPEG REQUIRED libopenjpeg)
+else()
+  message(FATAL_ERROR "OpenJPEG library not found!")
 endif()
 
 if (${USE_MAGICK} STREQUAL "OFF")
@@ -146,39 +171,53 @@ set (CMAKE_CXX_STANDARD_REQUIRED YES)
 
 set( MAIN_SRC
   src/safebmp.cc
-  src/olyvslideconv.cc
+  src/vmslideconv.cc
   src/jpgcachesupport.cc
+  src/tilecachesupport.cc
   src/imagesupport.cc
   src/jpgsupport.cc
   src/tiffsupport.cc
+  src/jp2kdecode.cc
   src/zipsupport.cc
+  src/virtualslide.cc
   src/composite.cc
   src/composite-read.cc
+  src/aperio.cc
   src/drawing.cc
   src/blend.cc
+  src/ycbcr.cc
 )
 
 set( MAIN_HEADERS
-  include/olyvslideconv.h
+  include/vmslideconv.h
+  include/virtualslide.h
   include/composite.h
+  include/aperio.h
   include/imagesupport.h
   include/jpgsupport.h
   include/jpgcachesupport.h
   include/tiffsupport.h
+  include/tilecachesupport.h
   include/zipsupport.h
   include/blendbkgd.h
+  include/safebmp.h
 )
 
 set( INFO_SRC
   src/imagesupport.cc
   src/tiffsupport.cc
+  src/tilecachesupport.cc
   src/svsinfo.cc
+  src/safebmp.cc
+  src/jp2kdecode.cc
+  src/ycbcr.cc 
 )
 
 set ( INFO_HEADERS
   include/tiffsupport.h
   include/imagesupport.h
   include/jpgsupport.h
+  include/safebmp.h
 )
 
 if (WIN32 OR WIN64 OR ${CMAKE_SYSTEM_NAME} MATCHES "Windows")
@@ -193,13 +232,12 @@ else()
   list(APPEND MAIN_SRC src/console-unix.cc)
 endif()
 
-include_directories(${MAGICKCORE_INCLUDE_DIRS} ${MAGICKWAND_INCLUDE_DIRS} ${OPENCV_INCLUDE_DIRS} ${LIBJPEG_INCLUDE_DIRS} ${LIBTIFF_INCLUDE_DIRS} ${MINIZIP_INCLUDE_DIRS} ${ZLIB_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/include)
-add_executable( olyvslideconv ${MAIN_SRC} ${MAIN_HEADERS} )
-target_link_libraries( olyvslideconv ${MAGICKWAND_LIBRARIES} ${MAGICKCORE_LIBRARIES} ${OPENCV_LIBRARIES} ${LIBTIFF_LIBRARIES} ${LIBJPEG_LIBRARIES} ${MINIZIP_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
+include_directories(${MAGICKCORE_INCLUDE_DIRS} ${MAGICKWAND_INCLUDE_DIRS} ${OPENCV_INCLUDE_DIRS} ${LIBJPEG_INCLUDE_DIRS} ${LIBTIFF_INCLUDE_DIRS} ${LIBOPENJPEG_INCLUDE_DIRS} ${MINIZIP_INCLUDE_DIRS} ${ZLIB_INCLUDE_DIR} C:/msys64/mingw64/include/openjpeg-2.4 ${CMAKE_CURRENT_SOURCE_DIR}/include)
+add_executable( vmslideconv ${MAIN_SRC} ${MAIN_HEADERS} )
+target_link_libraries( vmslideconv ${MAGICKWAND_LIBRARIES} ${MAGICKCORE_LIBRARIES} ${OPENCV_LIBRARIES} ${LIBTIFF_LIBRARIES} ${LIBJPEG_LIBRARIES} ${LIBOPENJPEG_LIBRARIES} ${MINIZIP_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 
 add_executable( svsinfo ${INFO_SRC} )
-target_link_libraries( svsinfo ${LIBTIFF_LIBRARIES})
+target_link_libraries( svsinfo ${LIBTIFF_LIBRARIES} ${LIBOPENJPEG_LIBRARIES})
 
-install(TARGETS olyvslideconv DESTINATION bin)
+install(TARGETS vmslideconv DESTINATION bin)
 install(TARGETS svsinfo DESTINATION bin)
-

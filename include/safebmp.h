@@ -1,13 +1,15 @@
-#ifndef SAFE_BMP
-#define SAFE_BMP
+#ifndef __SAFEBMP_FILE_H
+#define __SAFEBMP_FILE_H
+
 #ifdef __cplusplus
 #include <cstdint>
+#include <cstring>
 #else
 #include <string.h>
 #endif
 
 #ifndef BYTE
-#define BYTE uint8_t
+typedef uint8_t BYTE;
 #endif 
 
 typedef struct 
@@ -22,6 +24,7 @@ typedef struct
 
 safeBmp* safeBmpAlloc(int64_t width, int64_t height);
 uint8_t* safeBmpAlloc2(safeBmp*, int64_t width, int64_t height);
+uint8_t* safeBmpReAlloc2(safeBmp*, int64_t width, int64_t height);
 void safeBmpInit(safeBmp *bmp, BYTE *data, int64_t width, int64_t height);
 void safeBmpUint32Set(safeBmp *bmp, uint32_t value);
 inline void safeBmpByteSet(safeBmp *bmp, int value) { memset(bmp->data, value, bmp->strideWidth * bmp->height); }
@@ -30,5 +33,6 @@ safeBmp* safeBmpSrc(BYTE* data, int64_t width, int64_t height);
 void safeBmpCpy(safeBmp *bmpDest, int64_t x_dest, int64_t y_dest, safeBmp *bmp_src, int64_t x_src, int64_t y_src, int64_t cols, int64_t rows);
 inline void safeBmpClear(safeBmp *bmp) { bmp->width = 0; bmp->height = 0; bmp->strideWidth = 0; bmp->data = 0; bmp->freeData = false; bmp->freePtr = false; }
 void safeBmpBGRtoRGBCpy(safeBmp *bmpDest, safeBmp *bmpSrc);
-#endif
+void safeBmpRotate(safeBmp *bmpDest, safeBmp *bmpSrc, int orientation);
 
+#endif

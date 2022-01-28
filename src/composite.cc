@@ -15,7 +15,6 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 **************************************************************************/
-
 #include <new>
 #include <vector>
 #include <string>
@@ -31,9 +30,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <cmath>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include "olyvslideconv.h"
+#include "vmslideconv.h"
+#include "composite.h"
 
-const char* CompositeSlide::miniNames[4][4] = 
+const char* CompositeSlide::mMiniNames[4][4] = 
 { 
   {
     "FinalScan.ini", "FinalCond.ini", 
@@ -54,37 +54,68 @@ const char* CompositeSlide::miniNames[4][4] =
 };
 
 
-CompositeSlide::CompositeSlide()
+void CompositeSlide::compositeClearAttribs()
 {
-  initialize();
-  mValidObject = false;
-  mbkgColor = 255;
+  mxStart=0;
+  myStart=0;
+  mxMax=0;
+  mxMin=0;
+  myMax=0;
+  myMin=0;
+}
+
+
+void CompositeSlide::compositeCleanup()
+{
+  if (mEtc.size()>0)
+  {
+    for (size_t i = 0; i < mEtc.size(); i++)
+    {
+      if (mEtc[i])
+      {
+        delete mEtc[i];
+        mEtc[i] = NULL;
+      }
+    }
+    mEtc.clear();
+  }
 }
 
 
 IniConf::IniConf()
 {
-  mname="";
+  mName="";
   mFound=false;
-  mxMin=0;
-  mxMax=0;
-  mxDiffMin=0;
-  myMin=0;
-  myMax=0;
-  myDiffMin=0;
   mxAdj=0.0;
   myAdj=0.0;
-  mTotalTiles=0;
-  mxAxis=0;
-  myAxis=0;
-  mPixelWidth=0;
-  mPixelHeight=0;
   mTotalWidth=0;
   mTotalHeight=0;
-  myStepSize=0;
-  mxStepSize=0;
   mIsPreviewSlide=false;
-  mQuality=0;
+}
+
+
+JpgIniConf::JpgIniConf()
+{
+  mPixelWidth=0;
+  mPixelHeight=0;
+  mDetailedWidth=0;
+  mDetailedHeight=0;
+  mOrgDetailedWidth=0;
+  mOrgDetailedHeight=0;
+  mTotalTiles=0;
+  mxMin=0;
+  mxMax=0;
+  myMin=0;
+  myMax=0;
+  mxDiffMin=0;
+  myDiffMin=0;
+  mxStepSize=0;
+  myStepSize=0;
+  mxAxis=0;
+  myAxis=0;
+  mxKnowStepSize=false;
+  myKnowStepSize=false;
+  mKnowStepSizes=false;
   for (int zSplit=0; zSplit < 2; zSplit++)
   {
     for (int zLevel=0; zLevel < 4; zLevel++)
@@ -92,85 +123,125 @@ IniConf::IniConf()
       mzStackExists[zSplit][zLevel] = false;
     }
   }
-}
-
-
-bool CompositeSlide::isPreviewSlide(size_t level)
-{
-  if (level < mConf.size() && mConf[level]->mFound) 
-  {
-    return mConf[level]->mIsPreviewSlide; 
-  }
-  return false;
-}
-
-
-bool CompositeSlide::checkZLevel(int level, int direction, int zLevel)
-{
-  return (mValidObject == true && level >= 0 && level < (int) mConf.size() && direction >= 0 && direction < 3 && mConf[level]->mFound && (direction==0 || mConf[level]->mzStackExists[direction-1][zLevel])) ? true : false; 
-}
-
-
-void CompositeSlide::initialize()
-{
-  mValidObject = false;
-  
-  //std::cout << "Ini Conf size: " << mConf.size();
-  if (mConf.size()>0)
-  {
-    for (size_t i = 0; i < mConf.size(); i++)
-    {
-      if (mConf[i])
-      {
-        delete mConf[i];
-        mConf[i] = NULL;
-      }
-    }
-    mConf.clear();
-  }
-  for (int i=0; i<4; i++)
-  {
-    IniConf *mConfLocal = new IniConf;
-    mConfLocal->mname = miniNames[0][i];
-    mConf.push_back(mConfLocal);
-  }
-  mxMin=0;
-  mxMax=0;
-  myMin=0;
-  myMax=0;
-  mmagnification = 0;
-  mTotalZLevels = 0;
-  mTotalBottomZLevels = 0;
-  mTotalTopZLevels = 0;
-  mGrayScale = false;
+  mQuality=70;
 } 
 
 
-void CompositeSlide::close()
+bool CompositeSlide::isPreviewSlide(int level)
 {
-  mValidObject = false;
-  if (mConf.size()>0)
-  {
-    for (size_t i = 0; i < mConf.size(); i++)
-    {
-      if (mConf[i])
-      {
-        delete mConf[i];
-        mConf[i] = NULL;
-      }
-    }
-    mConf.clear();
-  }
+  return (mValidObject && level < (int) mEtc.size() && level >= 0 && mEtc[level]->mFound) ? mEtc[level]->mIsPreviewSlide : false; 
+}
+
+
+std::vector<JpgFileXY>* CompositeSlide::getTileXYArray(int level)
+{ 
+  return (mValidObject && level < (int) mEtc.size() && level >= 0 && mEtc[level]->mFound) ? &mEtc[level]->mxyArr : NULL; 
 }
 
 
 bool CompositeSlide::checkLevel(int level)
 {
-  if (mValidObject == false || level < 0 || level > (int) mConf.size() || mConf[level]->mFound == false || mConf[level]->mKnowStepSizes == false) 
+  return (mValidObject && level >= 0 && level < (int) mEtc.size() && mEtc[level]->mFound && mEtc[level]->mKnowStepSizes) ? true : false;
+}
+
+
+bool CompositeSlide::checkZLevel(int level, int direction, int zLevel)
+{
+  return (mValidObject && level >= 0 && level < (int) mEtc.size() && direction >= 0 && direction < 3 && mEtc[level]->mFound && (direction==0 || mEtc[level]->mzStackExists[direction-1][zLevel])) ? true : false; 
+}
+
+
+int CompositeSlide::getTotalLevels()
+{
+  return (int) mEtc.size();
+}
+
+
+int CompositeSlide::getTotalZLevels() 
+{ 
+  return mValidObject == true ? mTotalZLevels : 0; 
+}
+
+
+int CompositeSlide::getTotalBottomZLevels() 
+{ 
+  return mValidObject == true ? mTotalBottomZLevels : 0; 
+}
+
+
+int CompositeSlide::getTotalTopZLevels() 
+{ 
+  return mValidObject == true ? mTotalTopZLevels : 0; 
+}
+
+
+int CompositeSlide::getQuality(int level) 
+{ 
+  return (mValidObject == true && level < (int) mEtc.size() && level >= 0 && mEtc[level]->mFound) ? mEtc[level]->mQuality : 0; 
+}
+
+
+int64_t CompositeSlide::getPixelWidth(int level) 
+{ 
+  return (mValidObject == true && level < (int) mEtc.size() && level >= 0 && mEtc[level]->mFound ? mEtc[level]->mPixelWidth : 0); 
+}
+
+
+int64_t CompositeSlide::getPixelHeight(int level) 
+{ 
+  return (mValidObject == true && level < (int) mEtc.size() && level >= 0 && mEtc[level]->mFound ? mEtc[level]->mPixelHeight : 0); 
+}
+
+
+int64_t CompositeSlide::getActualWidth(int level) 
+{ 
+  return (mValidObject == true && level < (int) mEtc.size() && level >= 0 && mEtc[level]->mFound ? mEtc[level]->mTotalWidth : 0); 
+}
+
+
+int64_t CompositeSlide::getActualHeight(int level) 
+{ 
+  return (mValidObject == true && level < (int) mEtc.size() && level >= 0 && mEtc[level]->mFound ? mEtc[level]->mTotalHeight : 0); 
+}
+
+
+int64_t CompositeSlide::getLevelWidth(int level) 
+{ 
+  int64_t fullWidth = 0;
+  if (mValidObject == true && level < (int) mEtc.size() && level >= 0 && mEtc[level]->mFound)
   {
-    return false;
+    fullWidth = (mXYSwitched ? mEtc[level]->mTotalHeight : mEtc[level]->mTotalWidth); 
   }
-  return true;
+  return fullWidth;
+}
+
+
+int64_t CompositeSlide::getLevelHeight(int level) 
+{ 
+  int64_t fullHeight = 0;
+  if (mValidObject == true && level < (int) mEtc.size() && level >= 0 && mEtc[level]->mFound)
+  {
+    fullHeight = (mXYSwitched ? mEtc[level]->mTotalWidth : mEtc[level]->mTotalHeight); 
+  }
+  return fullHeight;
+}
+
+
+double CompositeSlide::getXAdj(int level) 
+{ 
+  return (mValidObject && level < (int) mEtc.size() && level >= 0 && mEtc[level]->mFound) ? mEtc[level]->mxAdj : 1; 
+}
+
+
+double CompositeSlide::getYAdj(int level) 
+{ 
+  return (mValidObject && level < (int) mEtc.size() && level >= 0 && mEtc[level]->mFound) ? mEtc[level]->myAdj : 1; 
+}
+
+
+int64_t CompositeSlide::getTotalTiles(int level) 
+{ 
+  return (mValidObject && level < (int) mEtc.size() && level >= 0 && mEtc[level]->mFound) ? mEtc[level]->mTotalTiles : 0; 
 }
 
 
@@ -181,21 +252,34 @@ bool CompositeSlide::open(const std::string& srcFileName, int options, int orien
   bool nameFound=false;
   bool xFound=false, yFound=false;
   bool header=false;
-  std::string iImageWidth = "iImageWidth";
-  std::string iImageHeight = "iImageHeight";
-  std::string lXStageRef = "lXStageRef";
-  std::string lYStageRef = "lYStageRef";
-  std::string lXStepSize = "lXStepSize";
-  std::string lYStepSize = "lYStepSize";
-  std::string lXOffset = "lXOffset";
-  std::string lYOffset = "lYOffset";
-  std::string headerStr = "header";
-  std::string dMagnification = "dMagnification";
-  std::string ImageQuality = "ImageQuality";
+  std::string iImageWidth = "IIMAGEWIDTH";
+  std::string iImageHeight = "IIMAGEHEIGHT";
+  std::string lXStageRef = "LXSTAGEREF";
+  std::string lYStageRef = "LYSTAGEREF";
+  std::string lXStepSize = "LXSTEPSIZE";
+  std::string lYStepSize = "LYSTEPSIZE";
+  std::string lXOffset = "LXOFFSET";
+  std::string lYOffset = "LYOFFSET";
+  std::string headerStr = "HEADER";
+  std::string dMagnification = "DMAGNIFICATION";
+  std::string ImageQuality = "IMAGEQUALITY";
+  std::string copyrightStr = "COPYRIGHT";
   std::string inputDir = srcFileName;
   mGrayScale = false;
 
-  initialize();
+  if (mValidObject)
+  {
+    compositeCleanup();
+    baseCleanup();
+    compositeClearAttribs();
+    baseClearAttribs();
+  }
+  for (int i=0; i<4; i++)
+  {
+    JpgIniConf *mConfLocal = new JpgIniConf;
+    mConfLocal->mName = mMiniNames[0][i];
+    mEtc.push_back(mConfLocal);
+  }
 
   mOptDebug = optDebug;
   mOrientation = orientation;
@@ -204,12 +288,13 @@ bool CompositeSlide::open(const std::string& srcFileName, int options, int orien
   int optUseCustomOffset = options & (CONV_CUSTOM_XOFFSET | CONV_CUSTOM_YOFFSET);
   mBestXOffset = bestXOffset;
   mBestYOffset = bestYOffset;
+  setXYSwitched(orientation);
 
   for (int i=0; i<4; i++)
   {
     for (int cases=0; cases < 4; cases++)
     {
-      size_t namePos=inputDir.find(miniNames[cases][i]);
+      size_t namePos=inputDir.find(mMiniNames[cases][i]);
       if (namePos != std::string::npos)
       {
         inputDir = srcFileName.substr(0, namePos-1);
@@ -233,7 +318,7 @@ bool CompositeSlide::open(const std::string& srcFileName, int options, int orien
   }
   for (int fileNum = 0; fileNum < 4; fileNum++)
   {
-    IniConf* pConf = mConf[fileNum];
+    JpgIniConf* pConf =  mEtc[fileNum];
     std::string inputName;
     std::ifstream iniFile;
     bool foundFile = false;
@@ -242,7 +327,7 @@ bool CompositeSlide::open(const std::string& srcFileName, int options, int orien
     {
       inputName = inputDir;
       inputName += separator();
-      inputName += miniNames[cases][fileNum];
+      inputName += mMiniNames[cases][fileNum];
     
       iniFile.open(inputName.c_str());
       if (iniFile.good())
@@ -255,7 +340,7 @@ bool CompositeSlide::open(const std::string& srcFileName, int options, int orien
     {
       inputName = inputDir;
       inputName += separator();
-      inputName += miniNames[0][fileNum];
+      inputName += mMiniNames[0][fileNum];
       std::cout << "Warning: Failed to open: '" << inputName << "'!" << std::endl;
     }
     xFound = false;
@@ -267,11 +352,18 @@ bool CompositeSlide::open(const std::string& srcFileName, int options, int orien
     while (iniFile.good() && iniFile.eof()==false)
     {
       std::string line="";
+      std::string rawLine="";
+      std::string normalLine="";
       do
       {
         c = iniFile.get();
         if (c == 0x0A || c == EOF) break;
-        if (c != 0x0D && c != ' ' && c != '\t') line += (char) c;
+        if (c != 0x0D) rawLine += (char) c;
+        if (c != 0x0D && c != ' ' && c != '\t')
+        {
+          normalLine += (char) c;
+          line += (char) toupper(c);
+        }
       } while (iniFile.eof()==false && iniFile.good());
 
       if (line.length()>=3)
@@ -283,8 +375,9 @@ bool CompositeSlide::open(const std::string& srcFileName, int options, int orien
           {
             pConf->mxyArr.push_back(jpgxy);
           }
-          std::string chunkName=line.substr(1, rpos-1);
-          if (strcasecmp(headerStr.c_str(), chunkName.c_str())==0)
+          std::string upperChunkName=line.substr(1, rpos-1);
+          std::string chunkName=normalLine.substr(1, rpos-1);
+          if (upperChunkName.compare(headerStr)==0)
           {
             jpgxy.mBaseFileName.clear();
             nameFound = false;
@@ -384,8 +477,8 @@ bool CompositeSlide::open(const std::string& srcFileName, int options, int orien
           size_t dMagPos = line.find(dMagnification);
           if (dMagPos != std::string::npos && dMagPos+dMagnification.length()+1<line.length())
           {
-            std::string dMagSubStr = line.substr(dMagPos+dMagnification.length()+1);
-            mmagnification = atoi(dMagSubStr.c_str());
+            std::string magLine = line.substr(dMagPos+dMagnification.length()+1);
+            parseMagStr(magLine);
           }
           size_t qualityPos = line.find(ImageQuality);
           if (qualityPos != std::string::npos && qualityPos+ImageQuality.length()+1<line.length())
@@ -401,9 +494,21 @@ bool CompositeSlide::open(const std::string& srcFileName, int options, int orien
               logFile << "Jpeg quality read from ini file: " << pConf->mQuality << std::endl;
             }
           }
+          size_t copyrightPos = line.find(copyrightStr);
+          if (copyrightPos != std::string::npos && copyrightPos+copyrightStr.length()+1<line.length())
+          {
+            size_t equalsPos = rawLine.find("=");
+            if (equalsPos != std::string::npos && equalsPos+1<rawLine.length())
+            {
+              equalsPos++;
+              while (equalsPos < rawLine.length() && 
+                     (rawLine[equalsPos] == ' ' || rawLine[equalsPos] == '\t')) equalsPos++;
+              if (equalsPos < line.length()) mCopyrightTxt = rawLine.substr(equalsPos);
+            }
+          }
         }
         std::string line2=line.substr(0, 2);
-        if (line2=="x=")
+        if (line2=="X=")
         {
           std::string somenum=line.substr(2);
           jpgxy.mx=atoi(somenum.c_str());
@@ -417,7 +522,7 @@ bool CompositeSlide::open(const std::string& srcFileName, int options, int orien
             xFound=true;
           }
         }
-        if (line2=="y=")
+        if (line2=="Y=")
         {
           std::string somenum=line.substr(2);
           jpgxy.my=atoi(somenum.c_str());
@@ -445,14 +550,14 @@ bool CompositeSlide::open(const std::string& srcFileName, int options, int orien
   bool yMinSet=false, xMaxSet=false, xMinSet=false, yMaxSet=false;
   for (int fileNum=0; fileNum < 4; fileNum++)
   {
-    IniConf* pConf=mConf[fileNum];
+    JpgIniConf* pConf =  mEtc[fileNum];
     if (pConf->mxyArr.size()==0) continue;
 
     pConf->mTotalTiles = pConf->mxyArr.size();
     if (pConf->mPixelWidth<=0 || pConf->mPixelHeight<=0)
     {
       Jpg jpg;
-      jpg.setUnfilledColor(mbkgColor);
+      jpg.setUnfilledColor(mBkgColor);
       if (jpg.open(pConf->mxyArr[0].mBaseFileName))
       {
         pConf->mPixelWidth=jpg.getActualWidth();
@@ -474,7 +579,7 @@ bool CompositeSlide::open(const std::string& srcFileName, int options, int orien
         return false;
       }
     }
-    if (optDebug > 1) logFile << "fileName=" << pConf->mname << " jpgWidth=" << pConf->mPixelWidth << " jpgHeight=" << pConf->mPixelHeight << std::endl;
+    if (optDebug > 1) logFile << "fileName=" << pConf->mName << " jpgWidth=" << pConf->mPixelWidth << " jpgHeight=" << pConf->mPixelHeight << std::endl;
     pConf->mFound = true;
     
     //************************************************************************
@@ -515,14 +620,14 @@ bool CompositeSlide::open(const std::string& srcFileName, int options, int orien
     }
     if (pConf->mxStepSize>0)
     {
-      if (optDebug > 1) logFile << "fileName=" << pConf->mname << " xAdj calculation exact=";
+      if (optDebug > 1) logFile << "fileName=" << pConf->mName << " xAdj calculation exact=";
       pConf->mxKnowStepSize = true;
     }
     else
     {
-      if (fileNum>0 && mConf[fileNum-1]->mFound && mConf[fileNum-1]->mxStepSize>0)
+      if (fileNum>0 && mEtc[fileNum-1]->mFound && mEtc[fileNum-1]->mxStepSize>0)
       {
-        pConf->mxStepSize = mConf[fileNum-1]->mxStepSize*4;
+        pConf->mxStepSize = mEtc[fileNum-1]->mxStepSize*4;
         pConf->mxKnowStepSize = true;
       }
       else
@@ -538,7 +643,7 @@ bool CompositeSlide::open(const std::string& srcFileName, int options, int orien
           pConf->mxKnowStepSize = false;
         }
       }
-      if (optDebug > 1) logFile << "fileName=" << pConf->mname << " Guessing xAdj=";
+      if (optDebug > 1) logFile << "fileName=" << pConf->mName << " Guessing xAdj=";
     }
    	//pConf->mxMin -= pConf->mxStepSize;
     if (pConf->mPixelWidth>0 && pConf->mxStepSize>0)
@@ -549,14 +654,14 @@ bool CompositeSlide::open(const std::string& srcFileName, int options, int orien
    
     if (pConf->myStepSize>0)
     {
-      if (optDebug > 1) logFile << "fileName=" << pConf->mname << " yAdj calculation exact=";
+      if (optDebug > 1) logFile << "fileName=" << pConf->mName << " yAdj calculation exact=";
       pConf->myKnowStepSize = true;
     }
     else
     {
-      if (fileNum>0 && mConf[fileNum-1]->mFound && mConf[fileNum-1]->myStepSize>0)
+      if (fileNum>0 && mEtc[fileNum-1]->mFound && mEtc[fileNum-1]->myStepSize>0)
       {
-        pConf->myStepSize = (int64_t) (mConf[fileNum-1]->myStepSize*4);
+        pConf->myStepSize = (int64_t) (mEtc[fileNum-1]->myStepSize*4);
         pConf->myKnowStepSize = true;
       }
       else
@@ -572,7 +677,7 @@ bool CompositeSlide::open(const std::string& srcFileName, int options, int orien
           pConf->myKnowStepSize = false;
         }
       }
-      if (optDebug > 1) logFile << "fileName=" << pConf->mname << " Guessing yAdj=";
+      if (optDebug > 1) logFile << "fileName=" << pConf->mName << " Guessing yAdj=";
     }
     //pConf->myMin -= pConf->myStepSize;
     pConf->mKnowStepSizes = (pConf->mxKnowStepSize && pConf->myKnowStepSize) ? true : false;
@@ -584,8 +689,8 @@ bool CompositeSlide::open(const std::string& srcFileName, int options, int orien
   
     if (optDebug > 1) 
     {
-      logFile << "fileName=" << pConf->mname << " xDiffMin=" << pConf->mxDiffMin << " xStepSize=" << pConf->mxStepSize << " xMin=" << pConf->mxMin << " xMax=" << pConf->mxMax << " xAxis=" << pConf->mxAxis << std::endl;
-      logFile << "fileName=" << pConf->mname << " yDiffMin=" << pConf->myDiffMin << " yStepSize=" << pConf->myStepSize << " yMin=" << pConf->myMin << " yMax=" << pConf->myMax << " yAxis=" << pConf->myAxis << std::endl;
+      logFile << "fileName=" << pConf->mName << " xDiffMin=" << pConf->mxDiffMin << " xStepSize=" << pConf->mxStepSize << " xMin=" << pConf->mxMin << " xMax=" << pConf->mxMax << " xAxis=" << pConf->mxAxis << std::endl;
+      logFile << "fileName=" << pConf->mName << " yDiffMin=" << pConf->myDiffMin << " yStepSize=" << pConf->myStepSize << " yMin=" << pConf->myMin << " yMax=" << pConf->myMax << " yAxis=" << pConf->myAxis << std::endl;
     }
     pConf->mOrgDetailedWidth = (int64_t) floor((pConf->mxMax - (pConf->mxMin - pConf->mxStepSize)) / pConf->mxAdj);
     pConf->mDetailedWidth = pConf->mOrgDetailedWidth;
@@ -637,33 +742,33 @@ bool CompositeSlide::open(const std::string& srcFileName, int options, int orien
   bool iniSortByAdj=true;
   for (int i=0; i<4; i++)
   {
-    if (mConf[i]->mFound==false || mConf[i]->mxAdj==0 || mConf[i]->myAdj==0)
+    if (mEtc[i]->mFound==false || mEtc[i]->mxAdj==0 || mEtc[i]->myAdj==0)
     {
       iniSortByAdj=false;
     }
   }
   if (iniSortByAdj)
   {
-    std::sort(mConf.begin(), mConf.end(), JpgFileXYSortForXAdj());
+    std::sort(mEtc.begin(), mEtc.end(), JpgFileXYSortForXAdj());
   }
   for (int fileNum=0; fileNum < 4; fileNum++)
   {
-    if (mConf[fileNum]->mxAxis==0 || mConf[fileNum]->myAxis==0)
+    if (mEtc[fileNum]->mxAxis==0 || mEtc[fileNum]->myAxis==0)
     {
       int targetFileNum;
-      if (fileNum==0 && mConf[2]->mxAxis > 0)
+      if (fileNum==0 && mEtc[2]->mxAxis > 0)
       {
         targetFileNum = 2;
       }
-      else if (fileNum==0 && mConf[1]->mxAxis > 0)
+      else if (fileNum==0 && mEtc[1]->mxAxis > 0)
       {
         targetFileNum = 1;
       }
-      else if (fileNum==2 && mConf[0]->mxAxis > 0)
+      else if (fileNum==2 && mEtc[0]->mxAxis > 0)
       {
         targetFileNum = 0;
       }
-      else if (fileNum==2 && mConf[1]->mxAxis > 0)
+      else if (fileNum==2 && mEtc[1]->mxAxis > 0)
       {
         targetFileNum = 1;
       }
@@ -677,28 +782,28 @@ bool CompositeSlide::open(const std::string& srcFileName, int options, int orien
       }
       if (targetFileNum >= 0)
       {
-        mConf[fileNum]->mxAxis = mConf[targetFileNum]->mxAxis;
-        mConf[fileNum]->myAxis = mConf[targetFileNum]->myAxis;
+        mEtc[fileNum]->mxAxis = mEtc[targetFileNum]->mxAxis;
+        mEtc[fileNum]->myAxis = mEtc[targetFileNum]->myAxis;
       }
       else
       {
-        mConf[fileNum]->mxAxis=278000;
-        mConf[fileNum]->myAxis=142500;
+        mEtc[fileNum]->mxAxis=278000;
+        mEtc[fileNum]->myAxis=142500;
       }
     }
-    if (mConf[fileNum]->mQuality == 0)
+    if (mEtc[fileNum]->mQuality == 0)
     {
       if (fileNum==1)
       {
-        mConf[fileNum]->mQuality = 90;
+        mEtc[fileNum]->mQuality = 90;
       }
       else if (fileNum>1)
       {
-        mConf[fileNum]->mQuality = 95;
+        mEtc[fileNum]->mQuality = 95;
       }
       else
       {
-        mConf[fileNum]->mQuality = 85;
+        mEtc[fileNum]->mQuality = 85;
       }
     }
   } 
@@ -709,7 +814,7 @@ bool CompositeSlide::open(const std::string& srcFileName, int options, int orien
   int level=-1;
   for (int min=3; min>=0; min--)
   {
-    if (mConf[min]->mFound==true && mConf[min]->mKnowStepSizes==true)
+    if (mEtc[min]->mFound==true && mEtc[min]->mKnowStepSizes==true)
     {
       level=min;
       break;
@@ -729,113 +834,113 @@ bool CompositeSlide::open(const std::string& srcFileName, int options, int orien
   double multiX[3] = { 1.0, 1.0, 1.0 };
   double multiY[3] = { 1.0, 1.0, 1.0 };
   
-  if (mConf[3]->mFound && mConf[2]->mFound)
+  if (mEtc[3]->mFound && mEtc[2]->mFound)
   {
-    multiX[2] = mConf[2]->mxAdj / mConf[3]->mxAdj;
-    multiY[2] = mConf[2]->myAdj / mConf[3]->myAdj;
+    multiX[2] = mEtc[2]->mxAdj / mEtc[3]->mxAdj;
+    multiY[2] = mEtc[2]->myAdj / mEtc[3]->myAdj;
   }
-  if (mConf[2]->mFound && mConf[1]->mFound)
+  if (mEtc[2]->mFound && mEtc[1]->mFound)
   {
-    multiX[1] = mConf[2]->mxAdj / mConf[1]->mxAdj;
-    multiY[1] = mConf[2]->myAdj / mConf[1]->myAdj;
+    multiX[1] = mEtc[2]->mxAdj / mEtc[1]->mxAdj;
+    multiY[1] = mEtc[2]->myAdj / mEtc[1]->myAdj;
   }
-  else if (mConf[3]->mFound && mConf[1]->mFound)
+  else if (mEtc[3]->mFound && mEtc[1]->mFound)
   {
-    multiX[1] = mConf[3]->mxAdj / mConf[1]->mxAdj;
-    multiY[1] = mConf[3]->myAdj / mConf[1]->myAdj;
+    multiX[1] = mEtc[3]->mxAdj / mEtc[1]->mxAdj;
+    multiY[1] = mEtc[3]->myAdj / mEtc[1]->myAdj;
   }
-  if (mConf[0]->mFound)
+  if (mEtc[0]->mFound)
   {
-    if (mConf[2]->mFound)
+    if (mEtc[2]->mFound)
     {
-      multiX[0] = mConf[2]->mxAdj / mConf[0]->mxAdj;
-      multiY[0] = mConf[2]->myAdj / mConf[0]->myAdj;
+      multiX[0] = mEtc[2]->mxAdj / mEtc[0]->mxAdj;
+      multiY[0] = mEtc[2]->myAdj / mEtc[0]->myAdj;
     }
-    else if (mConf[3]->mFound)
+    else if (mEtc[3]->mFound)
     {
-      multiX[0] = mConf[3]->mxAdj / mConf[0]->mxAdj;
-      multiY[0] = mConf[3]->myAdj / mConf[0]->myAdj;
+      multiX[0] = mEtc[3]->mxAdj / mEtc[0]->mxAdj;
+      multiY[0] = mEtc[3]->myAdj / mEtc[0]->myAdj;
     }
-    else if (mConf[1]->mFound)
+    else if (mEtc[1]->mFound)
     {
-      multiX[0] = mConf[1]->mxAdj / mConf[0]->mxAdj;
-      multiY[0] = mConf[1]->myAdj / mConf[0]->myAdj;
+      multiX[0] = mEtc[1]->mxAdj / mEtc[0]->mxAdj;
+      multiY[0] = mEtc[1]->myAdj / mEtc[0]->myAdj;
     }
   }
   
-  if (mConf[2]->mFound && mConf[2]->mKnowStepSizes)
+  if (mEtc[2]->mFound && mEtc[2]->mKnowStepSizes)
   {
-    mConf[2]->mTotalWidth = (int64_t)floor((double)(mConf[2]->mxMax - (mConf[2]->mxMin - mConf[2]->mxStepSize)) / (double) mConf[2]->mxAdj);
-    mConf[2]->mTotalHeight = (int64_t)floor((double)(mConf[2]->myMax - (mConf[2]->myMin - mConf[2]->myStepSize)) / (double) mConf[2]->myAdj);
+    mEtc[2]->mTotalWidth = (int64_t)floor((double)(mEtc[2]->mxMax - (mEtc[2]->mxMin - mEtc[2]->mxStepSize)) / (double) mEtc[2]->mxAdj);
+    mEtc[2]->mTotalHeight = (int64_t)floor((double)(mEtc[2]->myMax - (mEtc[2]->myMin - mEtc[2]->myStepSize)) / (double) mEtc[2]->myAdj);
 
-    mConf[3]->mTotalWidth = (int64_t) floor(mConf[2]->mTotalWidth * multiX[2]);
-    mConf[3]->mTotalHeight = (int64_t) floor(mConf[2]->mTotalHeight * multiY[2]);
+    mEtc[3]->mTotalWidth = (int64_t) floor(mEtc[2]->mTotalWidth * multiX[2]);
+    mEtc[3]->mTotalHeight = (int64_t) floor(mEtc[2]->mTotalHeight * multiY[2]);
 
-    mConf[1]->mTotalWidth = (int64_t) floor(mConf[2]->mTotalWidth * multiX[1]);
-    mConf[1]->mTotalHeight = (int64_t) floor(mConf[2]->mTotalHeight * multiY[1]);
+    mEtc[1]->mTotalWidth = (int64_t) floor(mEtc[2]->mTotalWidth * multiX[1]);
+    mEtc[1]->mTotalHeight = (int64_t) floor(mEtc[2]->mTotalHeight * multiY[1]);
 
-    mConf[0]->mTotalWidth = (int64_t) floor(mConf[2]->mTotalWidth * multiX[0]);
-    mConf[0]->mTotalHeight = (int64_t) floor(mConf[2]->mTotalHeight * multiY[0]);
+    mEtc[0]->mTotalWidth = (int64_t) floor(mEtc[2]->mTotalWidth * multiX[0]);
+    mEtc[0]->mTotalHeight = (int64_t) floor(mEtc[2]->mTotalHeight * multiY[0]);
   }
-  else if (mConf[3]->mFound && mConf[3]->mKnowStepSizes)
+  else if (mEtc[3]->mFound && mEtc[3]->mKnowStepSizes)
   {
-    mConf[3]->mTotalWidth = (int64_t) floor((double)(mConf[3]->mxMax - (mConf[3]->mxMin - mConf[3]->mxStepSize)) / (double) mConf[3]->mxAdj);
-    mConf[3]->mTotalHeight = (int64_t) floor((double)(mConf[3]->myMax - (mConf[3]->myMin - mConf[3]->myStepSize)) / (double) mConf[3]->myAdj);
+    mEtc[3]->mTotalWidth = (int64_t) floor((double)(mEtc[3]->mxMax - (mEtc[3]->mxMin - mEtc[3]->mxStepSize)) / (double) mEtc[3]->mxAdj);
+    mEtc[3]->mTotalHeight = (int64_t) floor((double)(mEtc[3]->myMax - (mEtc[3]->myMin - mEtc[3]->myStepSize)) / (double) mEtc[3]->myAdj);
 
-    mConf[1]->mTotalWidth = (int64_t) floor(mConf[3]->mTotalWidth * multiX[1]);
-    mConf[1]->mTotalHeight = (int64_t) floor(mConf[3]->mTotalHeight * multiY[1]);
-    mConf[0]->mTotalWidth = (int64_t) floor(mConf[3]->mTotalWidth * multiX[0]);
-    mConf[0]->mTotalHeight = (int64_t) floor(mConf[3]->mTotalHeight * multiY[0]);
+    mEtc[1]->mTotalWidth = (int64_t) floor(mEtc[3]->mTotalWidth * multiX[1]);
+    mEtc[1]->mTotalHeight = (int64_t) floor(mEtc[3]->mTotalHeight * multiY[1]);
+    mEtc[0]->mTotalWidth = (int64_t) floor(mEtc[3]->mTotalWidth * multiX[0]);
+    mEtc[0]->mTotalHeight = (int64_t) floor(mEtc[3]->mTotalHeight * multiY[0]);
   }
-  else if (mConf[1]->mFound && mConf[1]->mKnowStepSizes)
+  else if (mEtc[1]->mFound && mEtc[1]->mKnowStepSizes)
   {
-    mConf[1]->mTotalWidth = (int64_t) floor((double)(mConf[1]->mxMax - (mConf[1]->mxMin - mConf[1]->mxStepSize)) / (double) mConf[1]->mxAdj);
-    mConf[1]->mTotalHeight = (int64_t) floor((double)(mConf[1]->myMax - (mConf[1]->myMin - mConf[1]->myStepSize)) / (double) mConf[1]->myAdj);
+    mEtc[1]->mTotalWidth = (int64_t) floor((double)(mEtc[1]->mxMax - (mEtc[1]->mxMin - mEtc[1]->mxStepSize)) / (double) mEtc[1]->mxAdj);
+    mEtc[1]->mTotalHeight = (int64_t) floor((double)(mEtc[1]->myMax - (mEtc[1]->myMin - mEtc[1]->myStepSize)) / (double) mEtc[1]->myAdj);
 
-    mConf[0]->mTotalWidth = (int64_t) floor(mConf[1]->mTotalWidth * multiX[0]);
-    mConf[0]->mTotalHeight = (int64_t) floor(mConf[1]->mTotalHeight * multiY[0]);
+    mEtc[0]->mTotalWidth = (int64_t) floor(mEtc[1]->mTotalWidth * multiX[0]);
+    mEtc[0]->mTotalHeight = (int64_t) floor(mEtc[1]->mTotalHeight * multiY[0]);
   }
   else
   {
     for (int fileNum=0; fileNum < 4; fileNum++)
     {
-      mConf[fileNum]->mTotalWidth = (int64_t) floor((double)(mConf[fileNum]->mxMax - (mConf[fileNum]->mxMin - mConf[fileNum]->mxStepSize)) / (double) mConf[fileNum]->mxAdj);
-      mConf[fileNum]->mTotalHeight = (int64_t) floor((double)(mConf[fileNum]->myMax - (mConf[fileNum]->myMin - mConf[fileNum]->myStepSize)) / (double) mConf[fileNum]->myAdj);
+      mEtc[fileNum]->mTotalWidth = (int64_t) floor((double)(mEtc[fileNum]->mxMax - (mEtc[fileNum]->mxMin - mEtc[fileNum]->mxStepSize)) / (double) mEtc[fileNum]->mxAdj);
+      mEtc[fileNum]->mTotalHeight = (int64_t) floor((double)(mEtc[fileNum]->myMax - (mEtc[fileNum]->myMin - mEtc[fileNum]->myStepSize)) / (double) mEtc[fileNum]->myAdj);
     }
   }
 
   // log file width and height
   for (int fileNum=0; fileNum < 4; fileNum++)
   {
-    if (optDebug > 1) logFile << "fileName=" << mConf[fileNum]->mname << " totalWidth in pixels=" << mConf[fileNum]->mTotalWidth << " totalHeight in pixels=" << mConf[fileNum]->mTotalHeight << std::endl;
+    if (optDebug > 1) logFile << "fileName=" << mEtc[fileNum]->mName << " totalWidth in pixels=" << mEtc[fileNum]->mTotalWidth << " totalHeight in pixels=" << mEtc[fileNum]->mTotalHeight << std::endl;
   }
 
-  IniConf* pHigherConf = NULL;
-  IniConf* pLowerConf = NULL;
+  JpgIniConf* pHigherConf = NULL;
+  JpgIniConf* pLowerConf = NULL;
   int higherLevel = -1;
   int lowerLevel = -1;
   bool higherLevelFound = false, lowerLevelFound = false;
-  if (mConf[2]->mFound && mConf[2]->mKnowStepSizes)
+  if (mEtc[2]->mFound && mEtc[2]->mKnowStepSizes)
   {
-    pHigherConf = mConf[2];
+    pHigherConf = mEtc[2];
     higherLevelFound = true;
     higherLevel = 2;
   }
-  else if (mConf[3]->mFound && mConf[3]->mKnowStepSizes)
+  else if (mEtc[3]->mFound && mEtc[3]->mKnowStepSizes)
   {
-    pHigherConf = mConf[3];
+    pHigherConf = mEtc[3];
     higherLevelFound = true;
     higherLevel = 3;
   }
-  if (mConf[0]->mFound)
+  if (mEtc[0]->mFound)
   {
-    pLowerConf = mConf[0];
+    pLowerConf = mEtc[0];
     lowerLevel = 0;
     lowerLevelFound = true;
   }
-  if (mConf[1]->mFound)
+  if (mEtc[1]->mFound)
   {
-    pLowerConf = mConf[1];
+    pLowerConf = mEtc[1];
     lowerLevel = 1;
     lowerLevelFound = true;
   }
@@ -844,7 +949,7 @@ bool CompositeSlide::open(const std::string& srcFileName, int options, int orien
   //*****************************************************************
   for (int fileNum=2; fileNum<4; fileNum++)
   {
-    IniConf* pConf=mConf[fileNum];
+    JpgIniConf* pConf= mEtc[fileNum];
     if (pConf->mFound==false) continue;
      
     for (int64_t i=0; i<pConf->mTotalTiles; i++)
@@ -879,7 +984,7 @@ bool CompositeSlide::open(const std::string& srcFileName, int options, int orien
 
   int64_t bestXOffsetL0=0, bestXOffsetL1=0;
   int64_t bestYOffsetL0=0, bestYOffsetL1=0;
-  #ifndef USE_MAGICK
+  #ifdef USE_OPENCV
   if (lowerLevelFound && higherLevelFound && optOpenCVAlign)
   {
     findXYOffset(lowerLevel, higherLevel, &bestXOffsetL0, &bestYOffsetL0, &bestXOffsetL1, &bestYOffsetL1, optUseCustomOffset, optDebug, logFile);
@@ -893,21 +998,21 @@ bool CompositeSlide::open(const std::string& srcFileName, int options, int orien
     double higherMinBaseX = (double) (pLowerConf->mxAxis - pHigherConf->mxMax);
     double higherMinBaseY = (double) (pLowerConf->myAxis - pHigherConf->myMax);
 
-    if (mConf[0]->mFound)
+    if (mEtc[0]->mFound)
     {
-      double ratioAL0X = (double) mConf[0]->mPixelWidth / (double) mConf[0]->mxStepSize;
-      double ratioAL0Y = (double) mConf[0]->mPixelHeight / (double) mConf[0]->myStepSize;
-      double ratioBL0X = (double) pHigherConf->mxStepSize / (double) mConf[0]->mxStepSize;
-      double ratioBL0Y = (double) pHigherConf->myStepSize / (double) mConf[0]->myStepSize;
+      double ratioAL0X = (double) mEtc[0]->mPixelWidth / (double) mEtc[0]->mxStepSize;
+      double ratioAL0Y = (double) mEtc[0]->mPixelHeight / (double) mEtc[0]->myStepSize;
+      double ratioBL0X = (double) pHigherConf->mxStepSize / (double) mEtc[0]->mxStepSize;
+      double ratioBL0Y = (double) pHigherConf->myStepSize / (double) mEtc[0]->myStepSize;
 
-      double stageBaseL0X = (double) mConf[0]->mxAxis + ((double) pHigherConf->mxStepSize / 2);
-      stageBaseL0X -= (double) mConf[0]->mxStepSize / 2;
+      double stageBaseL0X = (double) mEtc[0]->mxAxis + ((double) pHigherConf->mxStepSize / 2);
+      stageBaseL0X -= (double) mEtc[0]->mxStepSize / 2;
 
-      double stageBaseL0Y = (double) mConf[0]->myAxis + ((double) pHigherConf->myStepSize / 2);
-      stageBaseL0Y -= (double) mConf[0]->myStepSize / 2;
+      double stageBaseL0Y = (double) mEtc[0]->myAxis + ((double) pHigherConf->myStepSize / 2);
+      stageBaseL0Y -= (double) mEtc[0]->myStepSize / 2;
 
-      double lowerMinBaseL0X = stageBaseL0X - mConf[0]->mxMax;
-      double lowerMinBaseL0Y = stageBaseL0Y - mConf[0]->myMax;
+      double lowerMinBaseL0X = stageBaseL0X - mEtc[0]->mxMax;
+      double lowerMinBaseL0Y = stageBaseL0Y - mEtc[0]->myMax;
    
       double minusL0X = higherMinBaseX * higherRatioX * ratioBL0X;
       double minusL0Y = higherMinBaseY * higherRatioY * ratioBL0Y;
@@ -915,21 +1020,21 @@ bool CompositeSlide::open(const std::string& srcFileName, int options, int orien
       bestXOffsetL0 = (int64_t) ceil(lowerMinBaseL0X * ratioAL0X - minusL0X);
       bestYOffsetL0 = (int64_t) ceil(lowerMinBaseL0Y * ratioAL0Y - minusL0Y);
     }
-    if (mConf[1]->mFound)
+    if (mEtc[1]->mFound)
     {
-      double ratioAL1X = (double) mConf[1]->mPixelWidth / (double) mConf[1]->mxStepSize;
-      double ratioAL1Y = (double) mConf[1]->mPixelHeight / (double) mConf[1]->myStepSize;
-      double ratioBL1X = (double) pHigherConf->mxStepSize / (double) mConf[1]->mxStepSize;
-      double ratioBL1Y = (double) pHigherConf->myStepSize / (double) mConf[1]->myStepSize;
+      double ratioAL1X = (double) mEtc[1]->mPixelWidth / (double) mEtc[1]->mxStepSize;
+      double ratioAL1Y = (double) mEtc[1]->mPixelHeight / (double) mEtc[1]->myStepSize;
+      double ratioBL1X = (double) pHigherConf->mxStepSize / (double) mEtc[1]->mxStepSize;
+      double ratioBL1Y = (double) pHigherConf->myStepSize / (double) mEtc[1]->myStepSize;
 
-      double stageBaseL1X = (double) mConf[1]->mxAxis + ((double) pHigherConf->mxStepSize / 2);
-      stageBaseL1X -= (double) mConf[1]->mxStepSize / 8;
+      double stageBaseL1X = (double) mEtc[1]->mxAxis + ((double) pHigherConf->mxStepSize / 2);
+      stageBaseL1X -= (double) mEtc[1]->mxStepSize / 8;
 
-      double stageBaseL1Y = (double) mConf[1]->myAxis + ((double) pHigherConf->myStepSize / 2);
-      stageBaseL1Y -= (double) mConf[1]->myStepSize / 8;
+      double stageBaseL1Y = (double) mEtc[1]->myAxis + ((double) pHigherConf->myStepSize / 2);
+      stageBaseL1Y -= (double) mEtc[1]->myStepSize / 8;
 
-      double lowerMinBaseL1X = stageBaseL1X - mConf[1]->mxMax;
-      double lowerMinBaseL1Y = stageBaseL1Y - mConf[1]->myMax;
+      double lowerMinBaseL1X = stageBaseL1X - mEtc[1]->mxMax;
+      double lowerMinBaseL1Y = stageBaseL1Y - mEtc[1]->myMax;
    
       double minusL1X = higherMinBaseX * higherRatioX * ratioBL1X;
       double minusL1Y = higherMinBaseY * higherRatioY * ratioBL1Y;
@@ -950,7 +1055,7 @@ bool CompositeSlide::open(const std::string& srcFileName, int options, int orien
   //*****************************************************************
   for (int fileNum=0; fileNum<2; fileNum++)
   {
-    IniConf* pConf=mConf[fileNum];
+    JpgIniConf* pConf= mEtc[fileNum];
     if (pConf->mFound==false) continue;
     pConf->mxSortedArr.resize(pConf->mxyArr.size());
 
@@ -995,24 +1100,26 @@ bool CompositeSlide::open(const std::string& srcFileName, int options, int orien
   // If orientation different, recalculate x and y coordinates
   // based on already existing ones
   //*****************************************************************
+  /*
   if (orientation != 0) 
   {
     setOrientation(orientation, logFile);
   }
-  
+  */
+
   if (higherLevelFound)
   {
     loadFullImage(higherLevel, ptpImageL2, NULL, orientation, 1.0, 1.0, false, optDebug, logFile);
   }
-  mbaseWidth = mConf[0]->mTotalWidth;
-  mbaseHeight = mConf[0]->mTotalHeight;
+  mBaseWidth = mEtc[0]->mTotalWidth;
+  mBaseHeight = mEtc[0]->mTotalHeight;
   std::string previewFileName = inputDir;
   previewFileName += separator();
   previewFileName += "PreviewSlide.jpg";
   Jpg previewJpg;
   if (previewJpg.open(previewFileName))
   {
-    IniConf *previewConf = new IniConf;
+    JpgIniConf *previewConf = new JpgIniConf;
     previewConf->mPixelWidth = previewConf->mTotalWidth = previewJpg.getActualWidth();
     previewConf->mPixelHeight = previewConf->mTotalHeight = previewJpg.getActualHeight();
     previewConf->mTotalTiles = 1;
@@ -1025,7 +1132,7 @@ bool CompositeSlide::open(const std::string& srcFileName, int options, int orien
     previewConf->mFound = true;
     previewConf->mxyArr.push_back(jpgxy);
     previewConf->mIsPreviewSlide = true;
-    mConf.push_back(previewConf);
+    mEtc.push_back(previewConf);
     previewJpg.close();
   }
   else
@@ -1036,21 +1143,23 @@ bool CompositeSlide::open(const std::string& srcFileName, int options, int orien
   return true;
 }
 
-#ifndef USE_MAGICK
+#ifdef USE_OPENCV
 bool CompositeSlide::findXYOffset(int lowerLevel, int higherLevel, int64_t *bestXOffset0, int64_t *bestYOffset0, int64_t *bestXOffset1, int64_t *bestYOffset1, int optUseCustomOffset, int optDebug, std::fstream& logFile)
 {
-  double xMulti0 = mConf[2]->mxAdj / mConf[0]->mxAdj;
-  double yMulti0 = mConf[2]->myAdj / mConf[0]->myAdj;
-  double xMulti1 = mConf[2]->mxAdj / mConf[1]->mxAdj;
-  double yMulti1 = mConf[2]->myAdj / mConf[1]->myAdj;
-  IniConf *pLowerConf = mConf[lowerLevel];
-  IniConf *pHigherConf = mConf[higherLevel];
+  double xMulti0 = mEtc[2]->mxAdj / mEtc[0]->mxAdj;
+  double yMulti0 = mEtc[2]->myAdj / mEtc[0]->myAdj;
+  double xMulti1 = mEtc[2]->mxAdj / mEtc[1]->mxAdj;
+  double yMulti1 = mEtc[2]->myAdj / mEtc[1]->myAdj;
+  JpgIniConf *pLowerConf =  mEtc[lowerLevel];
+  JpgIniConf *pHigherConf =  mEtc[higherLevel];
   if (pLowerConf->mFound == false || pHigherConf->mFound == false)
   {
     return false;
   }
+  /*
   double xZoomOut = pHigherConf->mxAdj / pLowerConf->mxAdj;
   double yZoomOut = pHigherConf->myAdj / pLowerConf->myAdj;
+  */
 
   cv::Mat *pImgComplete1 = NULL;
   cv::Mat *pImgComplete2 = NULL;
@@ -1058,18 +1167,7 @@ bool CompositeSlide::findXYOffset(int lowerLevel, int higherLevel, int64_t *best
   {
     logFile << "Reading Olympus level " << lowerLevel << " and scaling..." << std::endl;
   }
-  bool success = loadFullImage(lowerLevel, NULL, &pImgComplete1, 0, xZoomOut, yZoomOut, true, optDebug, logFile);
-  if (success == false)
-  {
-    std::cerr << "Warning! Failed to load lower Olympus level " << lowerLevel << ". Cannot use image matching to determine X and Y Offsets between the higher and lower levels!" << std::endl;
-    return false;
-  }
-
-  if (optDebug > 1) 
-  {
-    logFile << "Reading Olympus level " << higherLevel << "..." << std::endl;
-  }
-  success = loadFullImage(higherLevel, NULL, &pImgComplete2, 0, 1.0, 1.0, false, optDebug, logFile);
+  bool success = loadFullImage(higherLevel, NULL, &pImgComplete2, 0, 1.0, 1.0, false, optDebug, logFile);
   if (success == false)
   {   
     std::cerr << "Warning! Failed to load higher Olympus level " << lowerLevel << ". Cannot use image matching to determine X and Y Offsets between the higher and lower levels!" << std::endl;
@@ -1156,14 +1254,46 @@ bool CompositeSlide::findXYOffset(int lowerLevel, int higherLevel, int64_t *best
     logFile << std::endl;
   }
 
-  *bestXOffset0 = (int64_t) floor((double)(bestXOffset * xMulti0) + ((mConf[1]->mxMax - mConf[0]->mxMax) / mConf[0]->mxAdj));
-  *bestYOffset0 = (int64_t) floor((double)(bestYOffset * yMulti0) + ((mConf[1]->myMax - mConf[0]->myMax) / mConf[0]->myAdj));
+  *bestXOffset0 = (int64_t) floor((double)(bestXOffset * xMulti0) + ((mEtc[1]->mxMax - mEtc[0]->mxMax) / mEtc[0]->mxAdj));
+  *bestYOffset0 = (int64_t) floor((double)(bestYOffset * yMulti0) + ((mEtc[1]->myMax - mEtc[0]->myMax) / mEtc[0]->myAdj));
   *bestXOffset1 = (int64_t) floor(bestXOffset * xMulti1);
   *bestYOffset1 = (int64_t) floor(bestYOffset * yMulti1);
  
   return true;
 }
 #endif
+
+
+bool CompositeSlide::parseMagStr(std::string magLine)
+{
+  mMagFound = false;
+  mMag = 0;
+  mMagStr = "";
+  
+  size_t endStr = magLine.length();
+  size_t endNum = std::string::npos;
+  size_t startNum = std::string::npos;
+  for (size_t pos = 0; pos < endStr; pos++)
+  {
+    char k = magLine[pos];
+    if (isdigit(k) || (k == '.' && startNum != std::string::npos))
+    {
+      if (startNum == std::string::npos) startNum = pos;
+    }
+    else if (startNum != std::string::npos && endNum == std::string::npos)
+    {
+      endNum = pos;
+    }
+  } 
+  if (startNum != std::string::npos)
+  {
+    if (endNum == std::string::npos) endNum = endStr;
+    mMagStr = magLine.substr(startNum, endNum-startNum);
+    mMag = atof(mMagStr.c_str());
+    mMagFound = true;
+  }
+  return mMagFound;
+}
 
 
 bool CompositeSlide::setOrientation(int orientation, std::fstream& logFile)
@@ -1190,7 +1320,7 @@ bool CompositeSlide::setOrientation(int orientation, std::fstream& logFile)
   //*****************************************************************
   for (int fileNum=0; fileNum<4; fileNum++)
   {
-    IniConf* pConf=mConf[fileNum];
+    JpgIniConf* pConf= mEtc[fileNum];
     if (pConf->mFound==false) continue;
 
     int64_t totalTiles = pConf->mTotalTiles;
@@ -1261,10 +1391,10 @@ bool CompositeSlide::setOrientation(int orientation, std::fstream& logFile)
   return true;
 }
 
-#ifndef USE_MAGICK
+#ifdef USE_OPENCV
 bool CompositeSlide::loadFullImage(int level, safeBmp **ptpFullImage, cv::Mat **ptpMatImage, int orientation, double xZoomOut, double yZoomOut, bool useZoom, int optDebug, std::fstream& logFile)
 {
-  IniConf *pConf = mConf[level];
+  JpgIniConf *pConf =  mEtc[level];
   
   if (ptpFullImage == NULL && ptpMatImage == NULL) 
   {
@@ -1343,11 +1473,23 @@ bool CompositeSlide::loadFullImage(int level, safeBmp **ptpFullImage, cv::Mat **
       imgPart->release();
       imgPart = pImgScaled;
     }
-    double xPixelDbl=((double)(pConf->mxMax - pConf->mxyArr[i].mx)/(double)pConf->mxAdj);
-    double yPixelDbl=((double)(pConf->myMax - pConf->mxyArr[i].my)/(double)pConf->myAdj);
+    double xPixelDbl=0;
+    double yPixelDbl=0;
+    /*
+    if (mXYSwitched)
+    {
+      xPixelDbl=((double)(pConf->myMax - pConf->mxyArr[i].my)/(double)pConf->myAdj);
+      yPixelDbl=((double)(pConf->mxMax - pConf->mxyArr[i].mx)/(double)pConf->mxAdj);
+    }
+    else
+    {
+    */
+      xPixelDbl=((double)(pConf->mxMax - pConf->mxyArr[i].mx)/(double)pConf->mxAdj);
+      yPixelDbl=((double)(pConf->myMax - pConf->mxyArr[i].my)/(double)pConf->myAdj);
+      //}
     int64_t xPixel = (int64_t) round(xPixelDbl);
     int64_t yPixel = (int64_t) round(yPixelDbl);
-    int64_t cols = imgPart->cols;
+    int64_t cols = imgPart->cols;    
     int64_t rows = imgPart->rows;
     int64_t xPixelNew = xPixel;
     int64_t yPixelNew = yPixel;
@@ -1430,10 +1572,10 @@ bool CompositeSlide::loadFullImage(int level, safeBmp **ptpFullImage, cv::Mat **
   }
   if (ptpFullImage && pImgComplete && pImgComplete->data)
   {
-    safeBmp *pImageL2 = safeBmpAlloc(pConf->mDetailedWidth, pConf->mDetailedHeight);
+    safeBmp *pImageL2 = safeBmpAlloc(pImgComplete->cols, pImgComplete->rows);
     *ptpFullImage = pImageL2;
     safeBmp safeImgComplete2Ref;
-    safeBmpInit(&safeImgComplete2Ref, pImgComplete->data, pConf->mDetailedWidth, pConf->mDetailedHeight);
+    safeBmpInit(&safeImgComplete2Ref, pImgComplete->data, pImgComplete->cols, pImgComplete->rows);
     safeBmpBGRtoRGBCpy(pImageL2, &safeImgComplete2Ref);
     safeBmpFree(&safeImgComplete2Ref);
   }
@@ -1456,7 +1598,7 @@ bool CompositeSlide::loadFullImage(int level, safeBmp **ptpFullImage, cv::Mat **
 
 bool CompositeSlide::loadFullImage(int level, safeBmp **ptpImageL2, void **ptpMatImage, int orientation, double xZoomOut, double yZoomOut, bool useZoom, int optDebug, std::fstream& logFile)
 {
-  IniConf *pConf = mConf[level];
+  JpgIniConf *pConf =  mEtc[level];
   if (pConf->mFound == false)
   {
     return false;
@@ -1508,8 +1650,18 @@ bool CompositeSlide::loadFullImage(int level, safeBmp **ptpImageL2, void **ptpMa
         Magick::MagickRotateImage(magickWand2, pixelWand, (double) orientation);
         break;
     }
-    double xPixelDbl=((double)(pConf->mxMax - pConf->mxyArr[i].mx)/(double)pConf->mxAdj);
-    double yPixelDbl=((double)(pConf->myMax - pConf->mxyArr[i].my)/(double)pConf->myAdj);
+    double xPixelDbl=0;
+    double yPixelDbl=0;
+    if (mXYSwitched)
+    {
+      yPixelDbl=((double)(pConf->mxMax - pConf->mxyArr[i].mx)/(double)pConf->mxAdj);
+      xPixelDbl=((double)(pConf->myMax - pConf->mxyArr[i].my)/(double)pConf->myAdj);
+    }
+    else
+    {
+      xPixelDbl=((double)(pConf->mxMax - pConf->mxyArr[i].mx)/(double)pConf->mxAdj);
+      yPixelDbl=((double)(pConf->myMax - pConf->mxyArr[i].my)/(double)pConf->myAdj);
+    }
     int64_t xPixel = (int64_t) round(xPixelDbl);
     int64_t yPixel = (int64_t) round(yPixelDbl);
     int64_t xPixelNew = xPixel;
@@ -1577,4 +1729,65 @@ bool CompositeSlide::testHeader(BYTE* fileHeader, int64_t length)
   }
   return false;
 }
+
+bool JpgXYSortForX::operator() (const JpgXY& jpgXY1, const JpgXY& jpgXY2) 
+{
+  if (jpgXY1.mxPixel==jpgXY2.mxPixel)
+  {
+    return jpgXY1.myPixel<jpgXY2.myPixel;
+  }
+  else
+  {
+    return jpgXY1.mxPixel<jpgXY2.mxPixel;
+  }
+}
+
+bool JpgFileXY::operator < (const JpgFileXY& jpgFile) const
+{
+  if (jpgFile.myPixel==myPixel)
+  {
+    return mxPixel<jpgFile.mxPixel;
+  }
+  else
+  {
+    return myPixel<jpgFile.myPixel;
+  }
+}
+
+bool JpgFileXYSortForX::operator() (const JpgFileXY& jpgFile1, const JpgFileXY& jpgFile2) 
+{
+  if (jpgFile1.mx==jpgFile2.mx)
+  {
+    return jpgFile1.my<jpgFile2.my;
+  }
+  else
+  {
+    return jpgFile1.mx<jpgFile2.mx;
+  }
+}
+
+bool JpgFileXYSortForY::operator() (const JpgFileXY& jpgFile1, const JpgFileXY& jpgFile2) 
+{
+  if (jpgFile2.my==jpgFile1.my)
+  {
+    return jpgFile1.mx<jpgFile2.mx;
+  }
+  else
+  {
+    return jpgFile1.my<jpgFile2.my;
+  }
+}
+
+bool JpgFileXYSortForXAdj::operator() (const IniConf *iniConf1, const IniConf *iniConf2)
+{
+  return (iniConf1->mxAdj < iniConf2->mxAdj);
+}
+
+#ifdef USE_OPENCV
+bool CVMatchCompare::operator() (const cv::DMatch& match1, const cv::DMatch& match2) 
+{
+  return match1.distance < match2.distance;
+}
+#endif
+
 

@@ -26,7 +26,8 @@ int main(int argc, char** argv)
     std::cerr << "syntax: svsinfo filename" << std::endl;
     return 1;
   }
-  if (tif.load(argv[1])==false)
+  tif.setDebugMode(true);
+  if (tif.open(argv[1], false)==false)
   {
     std::string errMsg;
     tif.getErrMsg(errMsg);
