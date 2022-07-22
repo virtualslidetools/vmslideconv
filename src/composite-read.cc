@@ -8,112 +8,112 @@
 
 extern JpgCache jpgCache;
 
-bool CompositeSlide::read(safeBmp* pBmpDest, int level, int direction, int zLevel, int64_t x, int64_t y, int64_t width, int64_t height, int64_t *pReadWidth, int64_t *pReadHeight)
+bool CompositeSlide::read(safeBmp* pBmpDest, int level, int direction, int zLevel, int64_t x, int64_t y, int64_t cols, int64_t rows, int64_t *pReadCols, int64_t *pReadRows)
 {
-  *pReadWidth = 0;
-  *pReadHeight = 0;
+  *pReadCols = 0;
+  *pReadRows = 0;
   if (checkZLevel(level, direction, zLevel)==false || checkLevel(level)==false)
   {
     return false;
   }
-  int64_t actualWidth = mEtc[level]->mTotalWidth;
-  int64_t actualHeight = mEtc[level]->mTotalHeight;
-  if (x>actualWidth || y>actualHeight)
+  int64_t actualCols = mEtc[level]->mTotalCols;
+  int64_t actualRows = mEtc[level]->mTotalRows;
+  if (x>actualCols || y>actualRows)
   {
     std::cerr << "Warning: in CompositeSlide::read: x or y out of bounds: x=" << x << " y=" << y << std::endl;
     return true;
   }
-  if (width <= 0 || height <= 0)
+  if (cols <= 0 || rows <= 0)
   {
-    std::cerr << "Warning: in CompositeSlide::read: width or height out of bounds: width=" << width << " height=" << height << std::endl;
+    std::cerr << "Warning: in CompositeSlide::read: cols or rows out of bounds: cols=" << cols << " rows=" << rows << std::endl;
     return true;
   } 
-  if (x+width < 1 || y+width < 1)
+  if (x+cols < 1 || y+cols < 1)
   {
     return true;
   }
-  int64_t maxWidth=width;
-  int64_t maxHeight=height;
-  if (x+width>actualWidth)
+  int64_t maxCols=cols;
+  int64_t maxRows=rows;
+  if (x+cols>actualCols)
   {
-    maxWidth=actualWidth-x;
+    maxCols=actualCols-x;
   }
-  if (y+height>actualHeight)
+  if (y+rows>actualRows)
   {
-    maxHeight=actualHeight-y;
+    maxRows=actualRows-y;
   }
  
   JpgIniConf* pConf=mEtc[level];
-  int64_t fileWidth, fileHeight;
+  int64_t fileCols, fileRows;
 /*
   if (mOrientation == 90 || mOrientation == -90 || mOrientation == 270)
   {
-    fileWidth=pConf->mPixelHeight;
-    fileHeight=pConf->mPixelWidth;
+    fileCols=pConf->mPixelRows;
+    fileRows=pConf->mPixelCols;
   }
   else
   {
 */
-    fileWidth=pConf->mPixelWidth;
-    fileHeight=pConf->mPixelHeight;
+    fileCols=pConf->mPixelCols;
+    fileRows=pConf->mPixelRows;
 //  }
-  int64_t widthGrab=0, heightGrab=0;
+  int64_t colsGrab=0, rowsGrab=0;
   int64_t totalTilesRead=0;
   for (int64_t tileNum=0; tileNum<pConf->mTotalTiles; tileNum++)
   {
     if (zLevel > 0 && direction > 0 && pConf->mxyArr[tileNum].mzStack[direction-1][zLevel] == false) continue;
     int64_t xFilePos=pConf->mxyArr[tileNum].mxPixel;
     int64_t yFilePos=pConf->mxyArr[tileNum].myPixel;
-    if (((x<xFilePos && x+maxWidth>xFilePos) || (x>=xFilePos && x<xFilePos+fileWidth)) &&
-        ((y<yFilePos && y+maxHeight>yFilePos) || (y>=yFilePos && y<yFilePos+fileHeight)))
+    if (((x<xFilePos && x+maxCols>xFilePos) || (x>=xFilePos && x<xFilePos+fileCols)) &&
+        ((y<yFilePos && y+maxRows>yFilePos) || (y>=yFilePos && y<yFilePos+fileRows)))
     {
       Jpg *pJpg;
       int64_t xRead=0;
       int64_t xWrite=xFilePos-x;
-      widthGrab=(x+maxWidth)-xFilePos;
+      colsGrab=(x+maxCols)-xFilePos;
       if (xWrite<0)
       {
         xWrite=0;
         xRead=x-xFilePos;
-        widthGrab=fileWidth-xRead;
-        if (widthGrab>maxWidth)
+        colsGrab=fileCols-xRead;
+        if (colsGrab>maxCols)
         {
-          widthGrab=maxWidth;
+          colsGrab=maxCols;
         }
       }
       int64_t yRead=0;
       int64_t yWrite=yFilePos-y;
-      heightGrab=(y+maxHeight)-yFilePos;
+      rowsGrab=(y+maxRows)-yFilePos;
       if (yWrite<0)
       {
         yWrite=0;
         yRead=y-yFilePos;
-        heightGrab=fileHeight-yRead;
-        if (heightGrab>maxHeight)
+        rowsGrab=fileRows-yRead;
+        if (rowsGrab>maxRows)
         {
-          heightGrab=maxHeight;
+          rowsGrab=maxRows;
         }
       }
-      if (yRead+heightGrab>fileHeight)
+      if (yRead+rowsGrab>fileRows)
       {
-        heightGrab=fileHeight-yRead;
+        rowsGrab=fileRows-yRead;
       }
-      if (xRead+widthGrab>fileWidth)
+      if (xRead+colsGrab>fileCols)
       {
-        widthGrab=fileWidth-xRead;
+        colsGrab=fileCols-xRead;
       }
       std::string& fileName=(direction > 0 ? pConf->mxyArr[tileNum].mFileName[direction-1][zLevel] : pConf->mxyArr[tileNum].mBaseFileName);
       safeBmp bmpSrc;
-      safeBmpAlloc2(&bmpSrc, widthGrab, heightGrab);
+      safeBmpAlloc2(&bmpSrc, colsGrab, rowsGrab);
       pJpg=jpgCache.open(fileName, false);
-      if (pJpg && pJpg->isValidObject() && pJpg->read(&bmpSrc, xRead, yRead, widthGrab, heightGrab))
+      if (pJpg && pJpg->isValidObject() && pJpg->read(&bmpSrc, xRead, yRead, colsGrab, rowsGrab))
       {
-        safeBmpCpy(pBmpDest, xWrite, yWrite, &bmpSrc, 0, 0, bmpSrc.width, bmpSrc.height);
+        safeBmpCpy(pBmpDest, xWrite, yWrite, &bmpSrc, 0, 0, bmpSrc.cols, bmpSrc.rows);
         totalTilesRead++;
         if (level==2 && mOptBorder)
         {
           const int samplesPerPixel = 3;
-          drawBorder(pBmpDest->data, samplesPerPixel, x, y, maxWidth, maxHeight, level); 
+          drawBorder(pBmpDest->data, samplesPerPixel, x, y, maxCols, maxRows, level); 
         }
       }
       else
@@ -125,7 +125,7 @@ bool CompositeSlide::read(safeBmp* pBmpDest, int level, int direction, int zLeve
       safeBmpFree(&bmpSrc);
     }
   }
-  *pReadWidth=maxWidth;
-  *pReadHeight=maxHeight;
+  *pReadCols=maxCols;
+  *pReadRows=maxRows;
   return true;
 }

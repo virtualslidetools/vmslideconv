@@ -53,24 +53,7 @@ std::string boolInt2Txt(int cond)
 }
 
 
-void quickEnv(const char* var, const char* value, int optDebug)
-{
-  char full_char[512];
-  std::string full=var;
-  full.append("=");
-  full.append(value);
-  const char * full_const = full.c_str();
-  full_char[0] = 0;
-  strncpy(full_char, full_const, sizeof(full_char)-1);
-  if (optDebug > 0)
-  {
-    std::cout << "ENV: " << full_char << std::endl;
-  }
-  putenv(full_char);
-}
-
-
-int getBoolOpt(const char *optarg)
+int getBoolOpt(const char *txtoptarg)
 {
   const char *available[14] = { 
     "1", 
@@ -82,14 +65,14 @@ int getBoolOpt(const char *optarg)
     "disable", "DISABLE", 
     "off", "OFF" 
   };
-  if (optarg == NULL) 
+  if (txtoptarg == NULL) 
   {
     return 1;
   }
-  std::string optarg2 = optarg;
+  std::string txtoptarg2 = txtoptarg;
   for (int i = 0; i < 14; i++)
   {
-    if (optarg2.find(available[i]) != std::string::npos)
+    if (txtoptarg2.find(available[i]) != std::string::npos)
     {
       if (i < 7) return 1;
       else return 0;
@@ -99,7 +82,7 @@ int getBoolOpt(const char *optarg)
 }
 
 
-int getBoolOpt(const char *optarg, bool& invalidOpt)
+int getBoolOpt(const char *txtoptarg, bool& invalidOpt)
 {
   const char *available[14] = { 
     "1", 
@@ -111,14 +94,15 @@ int getBoolOpt(const char *optarg, bool& invalidOpt)
     "disable", "DISABLE", 
     "off", "OFF" 
   };
-  if (optarg == NULL) 
+  (void) invalidOpt;
+  if (txtoptarg == NULL) 
   {
     return 1;
   }
-  std::string optarg2 = optarg;
+  std::string txtoptarg2 = txtoptarg;
   for (int i = 0; i < 14; i++)
   {
-    if (optarg2.find(available[i]) != std::string::npos)
+    if (txtoptarg2.find(available[i]) != std::string::npos)
     {
       if (i < 7) return 1;
       else return 0;
@@ -128,71 +112,71 @@ int getBoolOpt(const char *optarg, bool& invalidOpt)
 }
 
 
-int getIntOpt(const char *optarg, bool& invalidOpt)
+int getIntOpt(const char *txtoptarg, bool& invalidOpt)
 {
   unsigned int i=0;
-  if (optarg==NULL)
+  if (txtoptarg==NULL)
   {
     invalidOpt = true;
     return 0;
   }
-  std::string optarg2 = optarg;
-  while (i < optarg2.length() && (optarg2[i]==' ' || optarg2[i]==':' || optarg2[i]=='=' || optarg2[i]=='\t')) i++;
-  optarg2 = optarg2.substr(i);
-  if (optarg2.length() > 0 && isdigit(optarg2[0]))
+  std::string txtoptarg2 = txtoptarg;
+  while (i < txtoptarg2.length() && (txtoptarg2[i]==' ' || txtoptarg2[i]==':' || txtoptarg2[i]=='=' || txtoptarg2[i]=='\t')) i++;
+  txtoptarg2 = txtoptarg2.substr(i);
+  if (txtoptarg2.length() > 0 && isdigit(txtoptarg2[0]))
   {
-    return atoi(optarg2.c_str());
+    return atoi(txtoptarg2.c_str());
   }
   invalidOpt = true;
   return 0;
 }
 
 
-double getDoubleOpt(const char *optarg, bool& invalidOpt)
+double getDoubleOpt(const char *txtoptarg, bool& invalidOpt)
 {
   unsigned int i=0;
-  if (optarg==NULL)
+  if (txtoptarg==NULL)
   {
     invalidOpt = true;
     return 0;
   }
-  std::string optarg2 = optarg;
-  while (i < optarg2.length() && (optarg2[i]==' ' || optarg2[i]==':' || optarg2[i]=='=' || optarg2[i]=='\t')) i++;
-  optarg2 = optarg2.substr(i);
-  if (optarg2.length() > 0 && isdigit(optarg2[0]))
+  std::string txtoptarg2 = txtoptarg;
+  while (i < txtoptarg2.length() && (txtoptarg2[i]==' ' || txtoptarg2[i]==':' || txtoptarg2[i]=='=' || txtoptarg2[i]=='\t')) i++;
+  txtoptarg2 = txtoptarg2.substr(i);
+  if (txtoptarg2.length() > 0 && isdigit(txtoptarg2[0]))
   {
-    return atof(optarg2.c_str());
+    return atof(txtoptarg2.c_str());
   }
   invalidOpt = true;
   return 0;
 }
 
 
-std::string getStrOpt(const char *optarg, bool& invalidOpt)
+std::string getStrOpt(const char *txtoptarg, bool& invalidOpt)
 {
-  std::string optarg2 = "";
+  std::string txtoptarg2 = "";
   unsigned int i=0;
-  if (optarg==NULL)
+  if (txtoptarg==NULL)
   {
     invalidOpt = true;
-    return optarg2;
+    return txtoptarg2;
   }
-  optarg2 = optarg;
-  while (i < optarg2.length() && (optarg2[i]==' ' || optarg2[i]==':' || optarg2[i]=='=' || optarg2[i]=='\t' || optarg2[i] == '\'' || optarg2[i] == '"')) i++;
-  if (i < optarg2.length())
+  txtoptarg2 = txtoptarg;
+  while (i < txtoptarg2.length() && (txtoptarg2[i]==' ' || txtoptarg2[i]==':' || txtoptarg2[i]=='=' || txtoptarg2[i]=='\t' || txtoptarg2[i] == '\'' || txtoptarg2[i] == '"')) i++;
+  if (i < txtoptarg2.length())
   {
-    optarg2 = optarg2.substr(i);
-    i = (unsigned int) optarg2.length();
-    while (i > 0 && (optarg2[i]==' ' || optarg2[i]=='\t' || optarg2[i] == '\'' || optarg2[i] == '"')) i--;
+    txtoptarg2 = txtoptarg2.substr(i);
+    i = (unsigned int) txtoptarg2.length();
+    while (i > 0 && (txtoptarg2[i]==' ' || txtoptarg2[i]=='\t' || txtoptarg2[i] == '\'' || txtoptarg2[i] == '"')) i--;
     if (i > 0)
     {
-      optarg2 = optarg2.substr(0, i);
-      return optarg2;
+      txtoptarg2 = txtoptarg2.substr(0, i);
+      return txtoptarg2;
     }
   }
   invalidOpt = true;
-  optarg2 = "";
-  return optarg2;
+  txtoptarg2 = "";
+  return txtoptarg2;
 }
 
 
@@ -216,42 +200,43 @@ typedef struct slidelevel_t
   int outLevel;
   bool center;
   bool tiled;
-  int64_t srcTotalWidth;
-  int64_t srcTotalHeight;
-  int64_t srcTotalWidthL2;
-  int64_t srcTotalHeightL2;
+  int64_t srcTotalCols;
+  int64_t srcTotalRows;
+  int64_t srcTotalColsL2;
+  int64_t srcTotalRowsL2;
   int64_t L2Size;
-  int64_t destTotalWidth, destTotalWidth2;
-  int64_t destTotalHeight, destTotalHeight2;
-  int finalOutputWidth, finalOutputWidth2;
-  int finalOutputHeight, finalOutputHeight2;
-  int inputTileWidth;
-  int inputTileHeight;
+  int64_t destTotalCols, destTotalCols2;
+  int64_t destTotalRows, destTotalRows2;
+  int finalOutputCols, finalOutputCols2;
+  int finalOutputRows, finalOutputRows2;
+  int inputTileCols;
+  int inputTileRows;
   int totalSubTiles;
   int xSubTile, ySubTile;
-  int64_t readWidthL2;
-  int64_t readHeightL2;
-  int64_t preOrientResultWidth;
-  int64_t preOrientResultHeight;
-  int64_t readWidth;
-  int64_t readHeight;
-  int64_t grabWidthRead;
-  int64_t grabHeightRead;
-  int64_t widthPreOrient;
-  int64_t heightPreOrient;
+  int readSubTiles;
+  int64_t readColsL2;
+  int64_t readRowsL2;
+  int64_t preOrientResultCols;
+  int64_t preOrientResultRows;
+  int64_t readCols;
+  int64_t readRows;
+  int64_t grabColsRead;
+  int64_t grabRowsRead;
+  int64_t colsPreOrient;
+  int64_t rowsPreOrient;
   double magnifyX;
   double magnifyY;
-  double destTotalWidthDec;
-  double destTotalHeightDec;
+  double destTotalColsDec;
+  double destTotalRowsDec;
   double xScale, yScale;
   double xScaleL2, yScaleL2;
   double xScaleReverse, yScaleReverse;
   double xScaleResize, yScaleResize;
   double xBlendFactor;
   double yBlendFactor;
-  double grabWidthA, grabWidthB;
-  double grabHeightA, grabHeightB;
-  double grabWidthL2, grabHeightL2;
+  double grabColsA, grabColsB;
+  double grabRowsA, grabRowsB;
+  double grabColsL2, grabRowsL2;
   double xSrcPreOrient;
   double ySrcPreOrient;
   double xSrcRead;
@@ -259,37 +244,29 @@ typedef struct slidelevel_t
   double xSrc;
   double ySrc;
   bool readOkL2;
-  int64_t inputTileWidthRead;
-  int64_t inputTileHeightRead;
-  int64_t inputSubTileWidthRead;
-  int64_t inputSubTileHeightRead;
+  int64_t inputTileColsRead;
+  int64_t inputTileRowsRead;
+  int64_t inputSubTileColsRead;
+  int64_t inputSubTileRowsRead;
   int64_t xMargin;
   int64_t yMargin;
-  #ifdef USE_OPENCV
   int scaleMethod;
   int scaleMethodL2;
-  #else
-  Magick::FilterType scaleMethod;
-  Magick::FilterType scaleMethodL2;
-  #endif
   int64_t totalXSections, totalYSections;
   unsigned char bkgdColor;
   BlendSection **ySubSections;
   safeBmp* pBitmapSrc;
   safeBmp* pPreOrientBitmap;
   safeBmp* pBitmapL2;
-  safeBmp* pBitmap4;
+  safeBmp* pBitmapBlended;
   safeBmp* pBitmapFinal;
-  safeBmp bitmap1;
+  safeBmp wholeTile;
   safeBmp preOrientBitmap;
   safeBmp subTileBitmap;
-  safeBmp safeImgScaled;
+  safeBmp subTileScaled;
   safeBmp sizedBitmap;
   safeBmp sizedBitmap2;
-  safeBmp safeScaledL2Mini;
-  safeBmp safeScaledL2Mini2;
   safeBmp bitmapBlended;
-  int64_t bitmap4Size;
   bool fillin;
   int64_t xLevelOffset;
   int64_t yLevelOffset;
@@ -298,27 +275,22 @@ typedef struct slidelevel_t
   int yCenter;
   double xStartSrc;
   double yStartSrc;
+  double xSrcStart2;
+  double ySrcStart2;
   int64_t xOutTile, xTileMap;
   int64_t yOutTile, yTileMap;
   int64_t xEndTile, yEndTile;
   int64_t xDest;
   int64_t yDest;
-  int64_t outputLvlTotalWidth;
-  int64_t outputLvlTotalHeight;
-#ifdef USE_OPENCV
-  cv::Mat *pImgScaled;
-  cv::Mat *pImgScaledL2Mini;
-#else
-  safeBmp *pImgScaled;
-  safeBmp *pImgScaledL2Mini;
-  Magick::MagickWand *magickWand;
-  Magick::PixelWand *pixelWand;
-#endif
+  int64_t outputLvlTotalCols;
+  int64_t outputLvlTotalRows;
+  safeBmpZoomRes *pZoomRes;
   std::string *pTileName;
-  int writeOutputWidth;
-  int writeOutputHeight;
+  int writeOutputCols;
+  int writeOutputRows;
   int perc, percOld;
   bool onePercHit;
+  bool error;
 } SlideLevel;
 
 
@@ -346,10 +318,11 @@ protected:
   std::string mOutputFile;
   std::string mOutputDir;
   std::string mFileNameOnly;
-  int64_t mBaseTotalWidth, mBaseTotalHeight;
-  int64_t mBaseTotalWidth2, mBaseTotalHeight2;
-  int64_t mBaseActualWidth, mBaseActualHeight;
-  int64_t mBaseActualWidth2, mBaseActualHeight2;
+  std::string mYRoot, mYRootZip;
+  int64_t mBaseTotalCols, mBaseTotalRows;
+  int64_t mBaseTotalCols2, mBaseTotalRows2;
+  int64_t mBaseActualCols, mBaseActualRows;
+  int64_t mBaseActualCols2, mBaseActualRows2;
   int mBaseLevel;
   bool mCenter;
   int mOptQuality;
@@ -377,17 +350,20 @@ public:
   void setDebugLevel(int optDebug) { mOptDebug = optDebug; }
   void setQuality(int optQuality) { mOptQuality = optQuality; }
   void setMaxMem(int64_t optMaxMem) { mOptMaxMem = optMaxMem; }
-  int open(std::string inputFile, std::string outputFile, std::string hostname, int options, int orientation, int64_t optXOffset, int64_t optYOffset);
+  int open(std::string inputFile, std::string outputFile, std::string hostname, int options, int orientation);
   bool my_mkdir(std::string name);
   void calcCenters(int outLevel, int64_t& xCenter, int64_t& yCenter);
   int convert();
-  int outputLevel(int olympusLevel, int magnification, int outLevel, int options, int64_t readWidthL2, int64_t readHeightL2, safeBmp *pBitmapL2);
-  int checkFullL2(int64_t *pReadWidthL2, int64_t *pReadHeightL2, safeBmp **pFullL2);
+  int outputLevel(int olympusLevel, int magnification, int outLevel, int options, int64_t readColsL2, int64_t readRowsL2, safeBmp *pBitmapL2);
+  int checkFullL2(int64_t *pReadColsL2, int64_t *pReadRowsL2, safeBmp **pFullL2);
   int convert2Tif();
   int convert2Gmap();
-  void tileCleanup(SlideLevel &l);
+  void calcTilesPrep(SlideLevel& l);
+  void outputNextRow(SlideLevel& l);
+  void outputNextTile(SlideLevel& l);
+  void readAndProcessNextSubTile(SlideLevel &l);
+  void processReadSubTile(SlideLevel& l);
   void blendL2WithSrc(SlideLevel &l);
-  void processSrcTile(SlideLevel& l);
   void processGamma(SlideLevel& l);
   void printPercDone(SlideLevel& l);
 };
@@ -426,10 +402,10 @@ SlideConvertor::SlideConvertor()
   mLastZLevel=-1;
   mLastDirection=-1;
   mZSteps=0;
-  mBaseTotalWidth=0;
-  mBaseTotalWidth2=0;
-  mBaseTotalHeight=0;
-  mBaseTotalHeight2=0;
+  mBaseTotalCols=0;
+  mBaseTotalCols2=0;
+  mBaseTotalRows=0;
+  mBaseTotalRows2=0;
   mBaseLevel=0;
   mOptZStack=getBoolOpt(SLIDE_DEF_ZSTACK);
   mOptQuality=SLIDE_DEF_QUALITY;
@@ -445,47 +421,17 @@ SlideConvertor::SlideConvertor()
 
 void SlideConvertor::calcCenters(int outLevel, int64_t &xCenter, int64_t &yCenter)
 {
-  int64_t baseWidth = slide->getLevelWidth(mBaseLevel);
-  int64_t baseHeight = slide->getLevelHeight(mBaseLevel);
+  int64_t baseCols = slide->getLevelCols(mBaseLevel);
+  int64_t baseRows = slide->getLevelRows(mBaseLevel);
   int64_t gmapMaxSide = (1 << mTopOutLevel) * 256;
-  int64_t xBaseCenter = (gmapMaxSide - baseWidth) / 2;
-  int64_t yBaseCenter = (gmapMaxSide - baseHeight) / 2;
+  int64_t xBaseCenter = (gmapMaxSide - baseCols) / 2;
+  int64_t yBaseCenter = (gmapMaxSide - baseRows) / 2;
   
   int64_t xTopCenter = xBaseCenter >> mTopOutLevel;
   xCenter = xTopCenter << outLevel;
 
   int64_t yTopCenter = yBaseCenter >> mTopOutLevel;
   yCenter = yTopCenter << outLevel;
-}
-
-
-
-void SlideConvertor::tileCleanup(SlideLevel &l)
-{
-  if (l.pImgScaled)
-  {
-    #ifdef USE_OPENCV
-    l.pImgScaled->release();
-    delete l.pImgScaled;
-    #else
-    safeBmpFree(l.pImgScaled);
-    #endif
-    l.pImgScaled = 0;
-  }
-  if (l.pImgScaledL2Mini)
-  {
-    #ifdef USE_OPENCV
-    l.pImgScaledL2Mini->release();
-    delete l.pImgScaledL2Mini;
-    #else
-    safeBmpFree(l.pImgScaledL2Mini);
-    #endif
-    l.pImgScaledL2Mini = 0;
-  }
-  safeBmpFree(&l.subTileBitmap);
-  safeBmpFree(&l.sizedBitmap2);
-  safeBmpFree(&l.safeScaledL2Mini);
-  safeBmpFree(&l.safeScaledL2Mini2);
 }
 
 
@@ -497,13 +443,13 @@ void SlideConvertor::processGamma(SlideLevel &l)
 
   if (pSrc == NULL || pSrc->data == NULL) return;
 
-  int64_t strideWidth = pSrc->width * 3;
-  int64_t height = pSrc->height;
+  int64_t strideCols = pSrc->cols * 3;
+  int64_t rows = pSrc->rows;
 
-  for (int64_t y=0; y < height; y++)
+  for (int64_t y=0; y < rows; y++)
   {
-    BYTE * pBmpData2 = pBmpData + (y * strideWidth);
-    for (int64_t x=0; x < strideWidth; x++)
+    BYTE * pBmpData2 = pBmpData + (y * strideCols);
+    for (int64_t x=0; x < strideCols; x++)
     {
       double gamma = (double) *pBmpData2 / (double) 255.0f;
       double powed = pow(gamma, invGamma); 
@@ -522,10 +468,16 @@ void SlideConvertor::processGamma(SlideLevel &l)
 // read success
 void SlideConvertor::blendL2WithSrc(SlideLevel &l)
 {
-  safeBmp bitmapL2Mini;
-  safeBmp *pFinalL2 = &bitmapL2Mini;
+  safeBmp bitmapL2Mini, scaledL2Mini, scaledL2Mini2;
+  safeBmp *pCurrentL2Bmp = NULL;
 
   safeBmpClear(&bitmapL2Mini);
+  safeBmpClear(&scaledL2Mini);
+  safeBmpClear(&scaledL2Mini2);
+
+  int64_t scaledL2Cols = (int64_t) round(l.grabColsL2);
+  int64_t scaledL2Rows = (int64_t) round(l.grabRowsL2);
+
   int64_t xSrcStartL2=(int64_t) round(l.xSrc * l.xScaleL2);
   int64_t ySrcStartL2=(int64_t) round(l.ySrc * l.yScaleL2);
   int64_t xDestStartL2=0, yDestStartL2=0;
@@ -540,231 +492,349 @@ void SlideConvertor::blendL2WithSrc(SlideLevel &l)
     yDestStartL2 = abs(ySrcStartL2);
     ySrcStartL2 = 0;
   }
-  safeBmpAlloc2(&bitmapL2Mini, (int64_t) round(l.grabWidthL2), (int64_t) round(l.grabHeightL2));
+  safeBmpAlloc2(&bitmapL2Mini, scaledL2Cols, scaledL2Rows);
   safeBmpByteSet(&bitmapL2Mini, l.bkgdColor);
-  safeBmpCpy(&bitmapL2Mini, xDestStartL2, yDestStartL2, l.pBitmapL2, xSrcStartL2, ySrcStartL2, (int64_t) l.grabWidthL2, (int64_t) l.grabHeightL2);
-  #ifdef USE_OPENCV
-  l.pImgScaledL2Mini = new cv::Mat;
-  cv::Mat imgSrc((int) l.grabHeightL2, (int) l.grabWidthL2, CV_8UC3, bitmapL2Mini.data);
-  cv::Size scaledSize(l.finalOutputWidth, l.finalOutputHeight);
-  double xScaleResize = (double) l.inputTileWidth / (double) l.grabWidthL2;
-  double yScaleResize = (double) l.inputTileHeight / (double) l.grabHeightL2;
-  cv::resize(imgSrc, *l.pImgScaledL2Mini, scaledSize, xScaleResize, yScaleResize, l.scaleMethodL2);
-  imgSrc.release();
-  safeBmpInit(&l.safeScaledL2Mini, l.pImgScaledL2Mini->data, l.finalOutputWidth, l.finalOutputHeight);
-  #else
-  Magick::MagickSetCompression(l.magickWand, Magick::NoCompression);
-  Magick::MagickSetImageType(l.magickWand, Magick::TrueColorType);
-  Magick::MagickSetImageDepth(l.magickWand, 8);
-  Magick::MagickSetImageAlphaChannel(l.magickWand, Magick::OffAlphaChannel);
-  Magick::MagickNewImage(l.magickWand, l.grabWidthL2, l.grabHeightL2, l.pixelWand);
-  Magick::MagickImportImagePixels(l.magickWand, 0, 0, l.grabWidthL2, l.grabHeightL2, "RGB", Magick::CharPixel, bitmapL2Mini.data);
-  //Magick::MagickConstituteImage(l.magickWand, l.grabWidthL2, l.grabHeightL2, "RGB", Magick::CharPixel, bitmapL2Mini.data);
-  Magick::MagickResizeImage(l.magickWand, l.finalOutputWidth, l.finalOutputHeight, l.scaleMethodL2);
-  l.pImgScaledL2Mini = safeBmpAlloc(l.finalOutputWidth, l.finalOutputHeight);
-  safeBmpInit(&l.safeScaledL2Mini, l.pImgScaledL2Mini->data, l.finalOutputWidth, l.finalOutputHeight);
-  Magick::MagickExportImagePixels(l.magickWand, 0, 0, l.finalOutputWidth, l.finalOutputHeight, "RGB", Magick::CharPixel, l.safeScaledL2Mini.data);
-  Magick::ClearMagickWand(l.magickWand);
-  #endif
-  
-  pFinalL2 = &l.safeScaledL2Mini;
-  if (l.finalOutputWidth != l.finalOutputWidth2 || l.finalOutputHeight != l.finalOutputHeight2)
+  safeBmpCpy(&bitmapL2Mini, xDestStartL2, yDestStartL2, l.pBitmapL2, xSrcStartL2, ySrcStartL2, scaledL2Cols, scaledL2Rows);
+  double xScaleResize = (double) l.inputTileCols / (double) l.grabColsL2;
+  double yScaleResize = (double) l.inputTileRows / (double) l.grabRowsL2;
+
+  if (xScaleResize != 1.0 || yScaleResize != 1.0 || l.finalOutputCols != scaledL2Cols || l.finalOutputRows != scaledL2Rows)
   {
-    safeBmpAlloc2(&l.safeScaledL2Mini2, (int64_t) l.finalOutputWidth2, (int64_t) l.finalOutputHeight2);
-    safeBmpByteSet(&l.safeScaledL2Mini2, l.bkgdColor);
-    safeBmpCpy(&l.safeScaledL2Mini2, 0, 0, &l.safeScaledL2Mini, 0, 0, l.finalOutputWidth, l.finalOutputHeight);
-    pFinalL2 = &l.safeScaledL2Mini2;
+    safeBmpZoom2(&scaledL2Mini, &bitmapL2Mini, l.finalOutputCols, l.finalOutputRows, xScaleResize, yScaleResize, l.scaleMethodL2, l.pZoomRes);
+    pCurrentL2Bmp = &scaledL2Mini;
+  }
+  else
+  {
+    pCurrentL2Bmp = &bitmapL2Mini;
+  }
+
+  if (l.finalOutputCols != l.finalOutputCols2 || l.finalOutputRows != l.finalOutputRows2)
+  {
+    safeBmpAlloc2(&scaledL2Mini2, (int64_t) l.finalOutputCols2, (int64_t) l.finalOutputRows2);
+    safeBmpByteSet(&scaledL2Mini2, l.bkgdColor);
+    safeBmpCpy(&scaledL2Mini2, 0, 0, pCurrentL2Bmp, 0, 0, l.finalOutputCols, l.finalOutputRows);
+    pCurrentL2Bmp = &scaledL2Mini2;
   }
   if (l.optDebug > 1)
   {
-    std::string errMsg;
-    std::string l2TileName;//=*l.pTileName;
-    //l2TileName.append(".l2.jpg");
+    std::string jpgErrMsg;
+    std::string l2TileName;
     std::stringstream ss;
     ss << "vmslideconv.l2" << mPathSeparator << "l2.l" << l.olympusLevel << "x" << l.xSrc << "y" << l.ySrc << ".jpg";
     l2TileName=ss.str();
-    bool writeOk=my_jpeg_write(l2TileName, pFinalL2->data, (int) pFinalL2->width, (int) pFinalL2->height, l.optQuality, &errMsg);
-    if (!writeOk) 
+    int writeErrors=safeJpgWrite(pCurrentL2Bmp, l2TileName, l.optQuality, &jpgErrMsg);
+    if (writeErrors > 0) 
     {
-      std::cout << "Error writing debug file '" << l2TileName << "' errMsg: " << errMsg << std::endl;
+      std::cout << "Error writing debug file '" << l2TileName << "' errMsg: " << jpgErrMsg << std::endl;
     }
   }
-  safeBmpCpy(l.pBitmap4, 0, 0, l.pBitmapSrc, 0, 0, l.pBitmap4->width, l.pBitmap4->height);
-  xScaleResize = (double) mBaseTotalWidth / (double) l.srcTotalWidth;
-  yScaleResize = (double) mBaseTotalHeight / (double) l.srcTotalHeight;
+  safeBmpCpy(l.pBitmapBlended, 0, 0, l.pBitmapSrc, 0, 0, l.pBitmapBlended->cols, l.pBitmapBlended->rows);
+  xScaleResize = (double) mBaseTotalCols / (double) l.srcTotalCols;
+  yScaleResize = (double) mBaseTotalRows / (double) l.srcTotalRows;
   BlendArgs blendArgs;
   blendArgs.xSrc = l.xSrc;
   blendArgs.ySrc = l.ySrc;
-  blendArgs.grabWidthB = l.grabWidthB;
-  blendArgs.grabHeightB = l.grabHeightB;
+  blendArgs.grabColsB = l.grabColsB;
+  blendArgs.grabRowsB = l.grabRowsB;
   blendArgs.xMargin = 0;
   blendArgs.yMargin = 0;
   if (blendArgs.xSrc < 0)
   {
-    blendArgs.grabWidthB += blendArgs.xSrc;
+    blendArgs.grabColsB += blendArgs.xSrc;
     blendArgs.xSrc = 0;
     blendArgs.xMargin = l.xCenter;
   }
   if (blendArgs.ySrc < 0)
   {
-    blendArgs.grabHeightB += blendArgs.ySrc;
+    blendArgs.grabRowsB += blendArgs.ySrc;
     blendArgs.ySrc = 0;
     blendArgs.yMargin = l.yCenter;
   }
-  blendArgs.grabWidthB *= xScaleResize;
-  blendArgs.grabHeightB *= yScaleResize;
+  blendArgs.grabColsB *= xScaleResize;
+  blendArgs.grabRowsB *= yScaleResize;
   blendArgs.xSrc *= xScaleResize;
   blendArgs.ySrc *= yScaleResize;
-  blendArgs.pSafeDest = l.pBitmap4;
-  blendArgs.pSafeSrcL2 = &l.safeScaledL2Mini;
+  blendArgs.pSafeDest = l.pBitmapBlended;
+  blendArgs.pSafeSrcL2 = pCurrentL2Bmp;
   blendArgs.xFactor = l.xBlendFactor;
   blendArgs.yFactor = l.yBlendFactor;
   blendArgs.yFreeMap = l.ySubSections;
   blendArgs.ySize = l.totalYSections;
   blendLevels(&blendArgs);
-  l.pBitmapFinal = l.pBitmap4;
+  l.pBitmapFinal = l.pBitmapBlended;
+  
   safeBmpFree(&bitmapL2Mini);
+  safeBmpFree(&scaledL2Mini);
+  safeBmpFree(&scaledL2Mini2);
 }
 
 
-void SlideConvertor::processSrcTile(SlideLevel& l)
+void SlideConvertor::processReadSubTile(SlideLevel& l)
 {
   // rotate the bitmap if needed
   if (l.orientation == 0)
   {
-    l.readWidth = l.preOrientResultWidth;
-    l.readHeight = l.preOrientResultHeight;
+    l.readCols = l.preOrientResultCols;
+    l.readRows = l.preOrientResultRows;
   }
   else
   {
     safeBmpRotate(l.pBitmapSrc, l.pPreOrientBitmap, l.orientation);
     if (l.orientation == 90 || l.orientation == -90 || l.orientation == 270)
     {
-      l.readWidth = l.preOrientResultHeight;
-      l.readHeight = l.preOrientResultWidth;
+      l.readCols = l.preOrientResultRows;
+      l.readRows = l.preOrientResultCols;
     }
     else
     {
-      l.readWidth = l.preOrientResultWidth;
-      l.readHeight = l.preOrientResultHeight;
+      l.readCols = l.preOrientResultCols;
+      l.readRows = l.preOrientResultRows;
     }
   }
-  // Check if read height and width returned from composite read
+  // Check if read rows and cols returned from composite read
   // came back smaller than expected, resize the bitmap if so
-  if (l.readWidth != l.grabWidthRead || l.readHeight != l.grabHeightRead)
+  if (l.readCols != l.grabColsRead || l.readRows != l.grabRowsRead)
   {
-    safeBmpAlloc2(&l.sizedBitmap, l.grabWidthRead, l.grabHeightRead);
+    safeBmpAlloc2(&l.sizedBitmap, l.grabColsRead, l.grabRowsRead);
     safeBmpByteSet(&l.sizedBitmap, l.bkgdColor);
 
-    int64_t copyWidth=l.readWidth;
-    if (copyWidth > l.grabWidthRead) copyWidth=l.grabWidthRead;
-    int64_t copyHeight=l.readHeight;
-    if (copyHeight > l.grabHeightRead) copyHeight=l.grabHeightRead;
-    safeBmpCpy(&l.sizedBitmap, 0, 0, l.pBitmapSrc, 0, 0, copyWidth, copyHeight);
+    int64_t copyCols=l.readCols;
+    if (copyCols > l.grabColsRead) copyCols=l.grabColsRead;
+    int64_t copyRows=l.readRows;
+    if (copyRows > l.grabRowsRead) copyRows=l.grabRowsRead;
+    safeBmpCpy(&l.sizedBitmap, 0, 0, l.pBitmapSrc, 0, 0, copyCols, copyRows);
     l.pBitmapSrc = &l.sizedBitmap;
     l.pBitmapFinal = &l.sizedBitmap;
   }
   // Check if the grabbed data needs to be scaled in or out
   // If we are at the very bottom of the image pyramid, this part will
   // be skipped because no scaling will be done
-  if (l.grabWidthRead!=l.inputSubTileWidthRead || l.grabHeightRead!=l.inputSubTileHeightRead)
+  if (l.grabColsRead!=l.inputSubTileColsRead || l.grabRowsRead!=l.inputSubTileRowsRead)
   {
-    #ifdef USE_OPENCV
-    l.pImgScaled = new cv::Mat;
-    cv::Mat imgSrc((int) l.grabHeightRead, (int) l.grabWidthRead, CV_8UC3, l.pBitmapSrc->data);
-    cv::Size scaledSize((int) l.inputSubTileWidthRead, (int) l.inputSubTileHeightRead);
-    double xScaleResize = (double) l.inputSubTileWidthRead / (double) l.grabWidthRead;
-    double yScaleResize = (double) l.inputSubTileHeightRead / (double) l.grabHeightRead;
-    cv::resize(imgSrc, *l.pImgScaled, scaledSize, xScaleResize, yScaleResize, l.scaleMethod);
-    imgSrc.release();
-    safeBmpInit(&l.safeImgScaled, l.pImgScaled->data, l.inputSubTileWidthRead, l.inputSubTileHeightRead);
-
-    #else
-    Magick::MagickSetCompression(l.magickWand, Magick::NoCompression);
-    Magick::MagickSetImageType(l.magickWand, Magick::TrueColorType);
-    Magick::MagickSetImageDepth(l.magickWand, 8);
-    Magick::MagickSetImageAlphaChannel(l.magickWand, Magick::OffAlphaChannel);
-    Magick::MagickNewImage(l.magickWand, l.grabWidthRead, l.grabHeightRead, l.pixelWand);
-    Magick::MagickImportImagePixels(l.magickWand, 0, 0, l.grabWidthRead, l.grabHeightRead, "RGB", Magick::CharPixel, l.pBitmapSrc->data);
-    //Magick::MagickConstituteImage(l.magickWand, l.grabWidthRead, l.grabHeightRead, "RGB", Magick::CharPixel, l.pBitmapSrc->data);
-    Magick::MagickResizeImage(l.magickWand, l.inputSubTileWidthRead, l.inputSubTileHeightRead, l.scaleMethod);
-    l.pImgScaled = safeBmpAlloc(l.inputSubTileWidthRead, l.inputSubTileHeightRead);
-    safeBmpInit(&l.safeImgScaled, l.pImgScaled->data, l.inputSubTileWidthRead, l.inputSubTileHeightRead);
-    Magick::MagickExportImagePixels(l.magickWand, 0, 0, l.inputSubTileWidthRead, l.inputSubTileHeightRead, "RGB", Magick::CharPixel, l.safeImgScaled.data);
-    //safeBmpInit(&l.safeImgScaled, (BYTE*) QueueAuthenticPixels(l.pImgScaled, 0, 0, l.inputTileWidthRead, l.inputTileHeightRead, NULL), l.inputTileWidthRead, l.inputTileHeightRead);  
-    Magick::ClearMagickWand(l.magickWand);
-    #endif
-    l.pBitmapSrc = &l.safeImgScaled;
-    l.pBitmapFinal = &l.safeImgScaled;
+    double xScaleResize = (double) l.inputSubTileColsRead / (double) l.grabColsRead;
+    double yScaleResize = (double) l.inputSubTileRowsRead / (double) l.grabRowsRead;
+    safeBmpZoom2(&l.subTileScaled, l.pBitmapSrc, l.inputSubTileColsRead, l.inputSubTileRowsRead, xScaleResize, yScaleResize, l.scaleMethod, l.pZoomRes);
+    l.pBitmapSrc = &l.subTileScaled;
+    l.pBitmapFinal = &l.subTileScaled;
   }
   // Check if the current input tile is smaller than what is needed
   // to process the L2 background with it. This can occur
   // if the grabbed original composite source image has different
   // dimensions (cx,cy) than what is need because of a margin
   // that is need to center the image the side of the grabbed image
-  if (l.totalSubTiles==1 && (l.inputSubTileWidthRead!=l.inputTileWidth || l.inputSubTileHeightRead!=l.inputTileHeight))
+  if (l.totalSubTiles==1 && (l.inputSubTileColsRead!=l.inputTileCols || l.inputSubTileRowsRead!=l.inputTileRows))
   {
-    safeBmpAlloc2(&l.sizedBitmap2, l.inputTileWidth, l.inputTileHeight);
+    safeBmpAlloc2(&l.sizedBitmap2, l.inputTileCols, l.inputTileRows);
     safeBmpByteSet(&l.sizedBitmap2, l.bkgdColor);
-    int64_t copyWidth = l.inputSubTileWidthRead;
-    if (l.xMargin + copyWidth > l.inputTileWidth)
+    int64_t copyCols = l.inputSubTileColsRead;
+    if (l.xMargin + copyCols > l.inputTileCols)
     {
-      copyWidth -= (l.xMargin + copyWidth) - l.inputTileWidth;
+      copyCols -= (l.xMargin + copyCols) - l.inputTileCols;
     }
-    int64_t copyHeight = l.inputSubTileHeightRead;
-    if (l.yMargin + copyHeight > l.inputTileHeight)
+    int64_t copyRows = l.inputSubTileRowsRead;
+    if (l.yMargin + copyRows > l.inputTileRows)
     {
-      copyHeight -= (l.yMargin + copyHeight) - l.inputTileHeight;
+      copyRows -= (l.yMargin + copyRows) - l.inputTileRows;
     }
-    if (copyWidth > 0 && copyHeight > 0)
+    if (copyCols > 0 && copyRows > 0)
     {
-      safeBmpCpy(&l.sizedBitmap2, l.xMargin, l.yMargin, l.pBitmapSrc, 0, 0, copyWidth, copyHeight);
+      safeBmpCpy(&l.sizedBitmap2, l.xMargin, l.yMargin, l.pBitmapSrc, 0, 0, copyCols, copyRows);
     }
     l.pBitmapSrc = &l.sizedBitmap2;
     l.pBitmapFinal = &l.sizedBitmap2;
   }          
   else if (l.totalSubTiles > 1)
   {
-    int64_t copyWidth = l.inputSubTileWidthRead;
-    if (l.xMargin + copyWidth > l.inputTileWidth)
+    int64_t copyCols = l.inputSubTileColsRead;
+    if (l.xMargin + copyCols > l.inputTileCols)
     {
-      copyWidth -= (l.xMargin + copyWidth) - l.inputTileWidth;
+      copyCols -= (l.xMargin + copyCols) - l.inputTileCols;
     }
-    int64_t copyHeight = l.inputSubTileHeightRead;
-    if (l.yMargin + copyHeight > l.inputTileHeight)
+    int64_t copyRows = l.inputSubTileRowsRead;
+    if (l.yMargin + copyRows > l.inputTileRows)
     {
-      copyHeight -= (l.yMargin + copyHeight) - l.inputTileHeight;
+      copyRows -= (l.yMargin + copyRows) - l.inputTileRows;
     }
-    int64_t xSubLoc = (int64_t) round((double) l.xSubTile * ((double) l.inputTileWidth / (double) l.totalSubTiles));
-    int64_t ySubLoc = (int64_t) round((double) l.ySubTile * ((double) l.inputTileHeight / (double) l.totalSubTiles));
+    int64_t xSubLoc = (int64_t) round((double) l.xSubTile * ((double) l.inputTileCols / (double) l.totalSubTiles));
+    int64_t ySubLoc = (int64_t) round((double) l.ySubTile * ((double) l.inputTileRows / (double) l.totalSubTiles));
     xSubLoc += l.xMargin;
     ySubLoc += l.yMargin;
-    if (copyWidth > 0 && copyHeight > 0)
+    if (copyCols > 0 && copyRows > 0)
     {
-      safeBmpCpy(&l.bitmap1, xSubLoc, ySubLoc, l.pBitmapSrc, 0, 0, copyWidth, copyHeight);
+      safeBmpCpy(&l.wholeTile, xSubLoc, ySubLoc, l.pBitmapSrc, 0, 0, copyCols, copyRows);
     }
-    l.pBitmapSrc = &l.bitmap1;
-    l.pBitmapFinal = &l.bitmap1;
+    l.pBitmapSrc = &l.wholeTile;
+    l.pBitmapFinal = &l.wholeTile;
   }
   if (l.optDebug > 1) 
   {
     std::string preTileName;
-    std::string errMsg;
+    std::string jpgErrMsg;
     std::stringstream ss;
     ss << "vmslideconv.z" << mPathSeparator << "z.l" << l.olympusLevel << "x" << l.xSrc << "y" << l.ySrc << ".jpg";
     preTileName=ss.str();
-    bool writeOk=my_jpeg_write(preTileName, l.pBitmapSrc->data, (int) l.pBitmapSrc->width, (int) l.pBitmapSrc->height, l.optQuality, &errMsg);
-    if (!writeOk)
+    int writeErrors=safeJpgWrite(l.pBitmapSrc, preTileName, l.optQuality, &jpgErrMsg);
+    if (writeErrors > 0)
     {
-      std::cout << "Error writing debug file: " << errMsg << std::endl;
+      std::cout << "Error writing debug file: " << jpgErrMsg << std::endl;
     }
   }
 }
 
 
+void SlideConvertor::readAndProcessNextSubTile(SlideLevel& l)
+{
+  l.xSrc = l.xSrcStart2 + (l.xSubTile * l.grabColsA);
+  if (round(l.xSrc) + round(l.grabColsA) < 1.0f) return;
+  
+  safeBmpClear(&l.preOrientBitmap);
+  safeBmpClear(&l.subTileBitmap);
+  safeBmpClear(&l.subTileScaled);
+  safeBmpClear(&l.sizedBitmap);
+  safeBmpClear(&l.sizedBitmap2);
+            
+  l.xSrcRead = l.xSrc;
+  l.ySrcRead = l.ySrc;
+  double grabColsReadDec = l.grabColsA;
+  double grabRowsReadDec = l.grabRowsA;
+  l.inputSubTileColsRead = (int64_t) round((double) l.inputTileCols / (double) l.totalSubTiles);
+  l.inputSubTileRowsRead = (int64_t) round((double) l.inputTileRows / (double) l.totalSubTiles);
+  l.xMargin = 0;
+  l.yMargin = 0;
+  if (l.xSrc < 0.0)
+  {
+    grabColsReadDec=l.grabColsA + l.xSrc;
+    l.xSrcRead = 0.0;
+    l.xMargin = l.xCenter - (l.xSubTile * l.inputSubTileColsRead);
+  }
+  if (l.ySrc < 0.0)
+  {
+    grabRowsReadDec=l.grabRowsA + l.ySrc;
+    l.ySrcRead = 0.0;
+    l.yMargin = l.yCenter - (l.ySubTile * l.inputSubTileRowsRead);
+  }
+  if (l.xSrcRead + grabColsReadDec > (double) l.srcTotalCols)
+  {
+    grabColsReadDec = (double) l.srcTotalCols - l.xSrcRead;
+    l.inputSubTileColsRead = (int64_t) round(grabColsReadDec * l.xScaleReverse);
+  }
+  if (l.ySrcRead + grabRowsReadDec > (double) l.srcTotalRows)
+  {
+    grabRowsReadDec = (double) l.srcTotalRows - l.ySrcRead;
+    l.inputSubTileRowsRead = (int64_t) round(grabRowsReadDec * l.yScaleReverse);
+  }
+  if (l.xSrc < 0.0 || l.ySrc < 0.0)
+  {
+    l.inputSubTileColsRead = (int64_t) round(grabColsReadDec * l.xScaleReverse);
+    l.inputSubTileRowsRead = (int64_t) round(grabRowsReadDec * l.yScaleReverse);
+  }
+  l.grabColsRead = (int64_t) round(grabColsReadDec);
+  l.grabRowsRead = (int64_t) round(grabRowsReadDec);
+  if (l.grabColsRead <= 0 || l.grabRowsRead <= 0) return;
+  bool allocOk = slide->allocate(&l.subTileBitmap, l.olympusLevel, (int64_t) round(l.xSrcRead), (int64_t) round(l.ySrcRead), l.grabColsRead, l.grabRowsRead, false);
+  if (allocOk == false) 
+  {
+    std::cerr << "Fatal error: Failed to allocate subtile bitmap!" << std::endl; 
+    exit(1);
+  }
+  if (mOrientation == 0)
+  {
+    l.xSrcPreOrient = l.xSrcRead;
+    l.ySrcPreOrient = l.ySrcRead;
+    l.colsPreOrient = l.grabColsRead;
+    l.rowsPreOrient = l.grabRowsRead;
+  }
+  else if (mOrientation == 90)
+  {
+    l.xSrcPreOrient = l.ySrcRead;
+    l.ySrcPreOrient = ((double) l.srcTotalCols - l.xSrcRead) - (double) l.grabColsRead;
+    l.colsPreOrient = l.grabRowsRead;
+    l.rowsPreOrient = l.grabColsRead;
+  }
+  else if (mOrientation == -90 || mOrientation == 270)
+  {
+    l.xSrcPreOrient = ((double) l.srcTotalRows - l.ySrcRead) - (double) l.grabRowsRead;
+    l.ySrcPreOrient = l.xSrcRead;
+    l.colsPreOrient = l.grabRowsRead;
+    l.rowsPreOrient = l.grabColsRead;
+  }
+  else if (mOrientation == 180)
+  {
+    l.xSrcPreOrient = ((double) l.srcTotalCols - l.xSrcRead) - (double) l.grabColsRead;
+    l.ySrcPreOrient = ((double) l.srcTotalRows - l.ySrcRead) - (double) l.grabRowsRead;
+    l.colsPreOrient = l.grabColsRead;
+    l.rowsPreOrient = l.grabRowsRead;
+  }
+  if (mOrientation == 0)
+  {
+    l.pPreOrientBitmap = &l.subTileBitmap;
+  }
+  else
+  {
+    allocOk = slide->allocate(&l.preOrientBitmap, l.olympusLevel, (int64_t) round(l.xSrcPreOrient), (int64_t) round(l.ySrcPreOrient), l.colsPreOrient, l.rowsPreOrient, true);
+    if (allocOk == false)
+    {
+      std::cerr << "Fatal error: Failed to allocate subtile bitmap!" << std::endl; 
+      exit(1);
+    }
+    l.pPreOrientBitmap = &l.preOrientBitmap;
+    safeBmpByteSet(&l.preOrientBitmap, l.bkgdColor);
+  }
+  l.pBitmapSrc = &l.subTileBitmap;
+  l.pBitmapFinal = &l.subTileBitmap;
+  safeBmpByteSet(&l.subTileBitmap, l.bkgdColor);
+            
+  l.readCols=0;
+  l.readRows=0;
+  if (l.pBitmapSrc->data == NULL)
+  {
+    std::cerr << "Fatal error: Failed to allocate subtile bitmap!" << std::endl; 
+    exit(1);
+  }
+  if (l.optDebug > 2)
+  {
+    *logFile << " slide->read(x=" << l.xSrcPreOrient << " y=" << l.ySrcPreOrient << " grabColsA=" << l.colsPreOrient << " grabRowsA=" << l.rowsPreOrient << " olympusLevel=" << l.olympusLevel << "); " << std::endl;
+  }
+  bool readOkSrc = slide->read(l.pPreOrientBitmap, l.olympusLevel, l.readDirection, l.readZLevel, (int64_t) round(l.xSrcPreOrient), (int64_t) round(l.ySrcPreOrient), l.colsPreOrient, l.rowsPreOrient, &l.preOrientResultCols, &l.preOrientResultRows);
+  if (readOkSrc)
+  {
+    l.readSubTiles++;
+  }
+  else
+  {
+    std::cerr << "Failed to read level " << l.olympusLevel << " tile @ x=" << l.xSrcPreOrient << " y=" << l.ySrcPreOrient << " cols=" << l.colsPreOrient << " rows=" << l.rowsPreOrient << std::endl;
+  }
+  if (l.optDebug > 2)
+  {
+    std::cout << "readCols: " << l.preOrientResultCols << " readRows: " << l.preOrientResultRows<< " grabCols: " << l.colsPreOrient << " grabRows: " << l.rowsPreOrient << std::endl;
+  }
+  if (readOkSrc)
+  {
+    if (l.optDebug > 2)
+    {
+      std::stringstream ss;
+      ss << "vmslideconv.a" << mPathSeparator << "a" << l.olympusLevel << "y" << l.ySrcPreOrient << "x" << l.xSrcPreOrient << ".jpg";
+      std::string fname = ss.str();
+      std::string jpgErrMsg;
+      safeJpgWrite(l.pPreOrientBitmap, fname, 90, &jpgErrMsg);
+    }
+    processReadSubTile(l);
+  }
+  if (l.totalSubTiles > 1)
+  {
+    safeBmpFree(&l.preOrientBitmap);
+    safeBmpFree(&l.subTileBitmap);
+    safeBmpFree(&l.subTileScaled);
+    safeBmpFree(&l.sizedBitmap);
+    safeBmpFree(&l.sizedBitmap2);
+  }
+  l.xSrc += l.grabColsA;
+}
+
+
 void SlideConvertor::printPercDone(SlideLevel& l)
 {
-  l.perc=(int)(((double) l.yDest / (double) l.outputLvlTotalHeight) * 100);
+  l.perc=(int)(((double) l.yDest / (double) l.outputLvlTotalRows) * 100);
   if (l.perc>100)
   {
     l.perc=100;
@@ -784,10 +854,347 @@ void SlideConvertor::printPercDone(SlideLevel& l)
 }
 
 
-int SlideConvertor::outputLevel(int olympusLevel, int magnification, int outLevel, int options, int64_t readWidthL2, int64_t readHeightL2, safeBmp *pBitmapL2)
+void SlideConvertor::outputNextTile(SlideLevel& l)
 {
-  std::ostringstream output;
+  std::ostringstream tileNameStream, tileNameStreamZip;
+  std::string fullTilePath;
+  l.xSrc = (l.xOutTile * l.grabColsB) + l.xStartSrc;
+  if (round(l.xSrc) + round(l.grabColsB) < 1.0f)
+  {
+    std::cerr << "For some reason we have hit this! l.xSrc=" << l.xSrc << " l.xStartSrc=" << l.xStartSrc << " l.grabColsB=" << l.grabColsB << std::endl;
+    return;
+  }
+  tileNameStream << mYRoot << mPathSeparator << l.xTileMap << ".jpg";
+  tileNameStreamZip << mYRootZip << ZipFile::mZipPathSeparator << l.xTileMap << ".jpg";
+  fullTilePath = tileNameStream.str();
+  l.pTileName = &fullTilePath;
+  l.inputSubTileColsRead = (int64_t) round((double) l.inputTileCols / (double) l.totalSubTiles);
+  l.inputSubTileRowsRead = (int64_t) round((double) l.inputTileRows / (double) l.totalSubTiles);
+  l.readSubTiles=0;
+  if (l.totalSubTiles > 1)
+  {
+    safeBmpByteSet(&l.wholeTile, l.bkgdColor);
+  }
+  l.pBitmapSrc = NULL;
+  l.xSrcStart2=l.xSrc;
+  l.ySrcStart2=l.ySrc;
+
+  safeBmpClear(&l.preOrientBitmap);
+  safeBmpClear(&l.subTileBitmap);
+  safeBmpClear(&l.subTileScaled);
+  safeBmpClear(&l.sizedBitmap);
+  safeBmpClear(&l.sizedBitmap2);
+
+  // this tile needs to be the same with and length as final output cols and length
+  l.ySubTile=0;
+  while (l.ySubTile < l.totalSubTiles && round(l.ySrc) < l.srcTotalRows)
+  {
+    l.xSrc = l.xSrcStart2;
+    l.ySrc = l.ySrcStart2 + (l.ySubTile * l.grabRowsA);
+    if (round(l.ySrc) + round(l.grabRowsA) < 1.0f) 
+    {
+      l.ySubTile++;
+      continue;
+    }
+    for (l.xSubTile=0; l.xSubTile < l.totalSubTiles && round(l.xSrc) < l.srcTotalCols; l.xSubTile++)
+    {
+      readAndProcessNextSubTile(l);
+    }
+    l.ySubTile++;
+    l.ySrc = l.ySrcStart2 + (l.ySubTile * l.grabRowsA);
+    printPercDone(l);
+  }
+  l.xSrc = l.xSrcStart2;
+  l.ySrc = l.ySrcStart2;
+  l.xSrcRead = l.xSrc;
+  l.ySrcRead = l.ySrc;
+  if (l.readSubTiles > 0) 
+  {
+    bool writeOk=false;
+    if (l.readOkL2 && l.optBlend)
+    {
+      blendL2WithSrc(l);  
+    }
+    if (l.optUseGamma)
+    {
+      processGamma(l);
+    }
+    if (l.optOutGoogle)
+    {
+      BYTE* pJpegBytes = NULL;
+      unsigned long outSize = 0;
+      std::string tileName = tileNameStreamZip.str();
+      int compressErrors = safeJpgCompress(l.pBitmapFinal, &pJpegBytes, l.optQuality, &errMsg, &outSize);
+      if ((int) outSize <= 0)
+      {
+        std::cout << "Outsize is <= 0!!!" << std::endl;
+      }
+      if (compressErrors == 0 && mZip->addFile(tileName, pJpegBytes, outSize)==OLY_ZIP_OK)
+      {
+        writeOk=true;
+      }
+      else
+      {
+        l.error=true;
+      }
+      safeJpgCompressFree(&pJpegBytes);
+    }
+    else if (l.optOutTif)
+    {
+      if (l.tiled)
+      {
+        writeOk=mTif->writeEncodedTile(l.pBitmapFinal->data, (unsigned int) l.xDest, (unsigned int) l.yDest, 1);
+      }
+      else
+      {
+        std::stringstream ss;
+        ss << "vmslideconv.l" << mPathSeparator << "l" << l.olympusLevel << "mag" << l.magnifyX << ".jpg";
+        std::string fname = ss.str();
+        std::string jpgErrMsg;
+        safeJpgWrite(l.pBitmapFinal, fname, 90, &jpgErrMsg); 
+        writeOk=mTif->writeImage(l.pBitmapFinal->data);
+      }
+    }
+    if (writeOk==false)
+    {
+      if (l.optOutGoogle)
+      {
+        std::cerr << "Failed to write jpeg tile '" << *l.pTileName << "' reason: " << mZip->getErrorMsg() << std::endl;
+      }
+      else if (l.optOutTif && l.tiled)
+      {
+        mTif->getErrMsg(errMsg);
+        std::cerr << "Failed to write tif tile x=" << l.xDest << " y=" << l.yDest << " reason: " << errMsg << std::endl;
+      }
+      else if (l.optOutTif && !l.tiled)
+      {
+        mTif->getErrMsg(errMsg);
+        std::cerr << "Failed to write tif image at tif level=" << l.outLevel << " reason: " << errMsg << std::endl;
+      }
+      l.error = true;
+    }
+  }
+  if (l.totalSubTiles == 1)
+  {
+    safeBmpFree(&l.preOrientBitmap);
+    safeBmpFree(&l.subTileBitmap);
+    safeBmpFree(&l.subTileScaled);
+    safeBmpFree(&l.sizedBitmap);
+    safeBmpFree(&l.sizedBitmap2);
+  }
+  l.xDest += l.finalOutputCols2;
+  l.xTileMap++;
+}
+
+
+void SlideConvertor::outputNextRow(SlideLevel& l)
+{
+  std::ostringstream yRootStream, yRootStreamZip;
+  std::string dirPart1, dirPartZip1;
+  std::string dirPart2, dirPartZip2;
+      
+  yRootStream << mFileNameOnly;
+  dirPart1 = yRootStream.str();
+  yRootStream << mPathSeparator << l.outLevel;
+  dirPart2 = yRootStream.str();
+  yRootStream << mPathSeparator << l.yTileMap;
+  mYRoot = yRootStream.str();
+  if (l.optDebug > 1)
+  {
+    // Create the google maps directory structure up to the the y tile
+    if (!my_mkdir(dirPart1) || !my_mkdir(dirPart2) || !my_mkdir(mYRoot))
+    {
+      std::cerr << "Failed to add create directory '" << mYRoot << "'. Stopping!" << std::endl;
+      l.error = true;
+      return;
+    }
+  }
+  yRootStreamZip << mFileNameOnly;
+  dirPartZip1 = yRootStreamZip.str();
+  yRootStreamZip << ZipFile::mZipPathSeparator << l.outLevel;
+  dirPartZip2 = yRootStreamZip.str();
+  yRootStreamZip << ZipFile::mZipPathSeparator << l.yTileMap;
+  mYRootZip = yRootStreamZip.str();
+  if (l.optOutGoogle) 
+  {
+    // Create the google maps directory structure up to the the y tile
+    if (mZip->addDir(dirPartZip1)==-1 || mZip->addDir(dirPartZip2)==-1 || mZip->addDir(mYRootZip)==-1)
+    {
+      std::cerr << "Failed to add zip directory '" << mYRoot << "' to archive. Reason: " << mZip->getErrorMsg() << std::endl << "Stopping!" << std::endl;
+      l.error = true;
+      return;
+    }
+  }
+  l.ySrc = (l.yOutTile * l.grabRowsB) + l.yStartSrc;
+  l.xSrc = l.xStartSrc;
+  l.xDest = 0;
+  l.xTileMap = l.xStartTile;
+  if (round(l.ySrc) + round(l.grabRowsB) < 1.0f)
+  {
+    std::cerr << "For some reason we have hit this! l.ySrc=" << l.ySrc << " l.yStartSrc=" << l.yStartSrc << " l.grabRowsB=" << l.grabRowsB << std::endl;
+    l.yOutTile++;
+    return;
+  }
+  for (l.xOutTile=0; l.xOutTile < l.xEndTile && round(l.xSrc) < l.srcTotalCols && l.error==false; l.xOutTile++) 
+  {
+    outputNextTile(l);
+  }
+  l.yDest += l.finalOutputRows2;
+  l.yTileMap++;
+  l.yOutTile++;
+  l.ySrc = (l.yOutTile * l.grabRowsB) + l.yStartSrc;
+  printPercDone(l);
+}
+
+
+void SlideConvertor::calcTilesPrep(SlideLevel& l)
+{
+  l.srcTotalCols = slide->getLevelCols(l.olympusLevel);
+  l.srcTotalRows = slide->getLevelRows(l.olympusLevel);
+  if (l.fillin && slide->checkLevel(2))
+  {
+    l.srcTotalColsL2 = slide->getLevelCols(2);
+    l.srcTotalRowsL2 = slide->getLevelRows(2);
+  }
+  else if (l.fillin && slide->checkLevel(3))
+  {
+    l.srcTotalColsL2 = slide->getLevelCols(3);
+    l.srcTotalRowsL2 = slide->getLevelRows(3);
+  }
+  else
+  {
+    l.fillin = false;
+  }
+  l.destTotalColsDec = (double) mBaseTotalCols / (double) l.magnifyX;
+  l.destTotalRowsDec = (double) mBaseTotalRows / (double) l.magnifyY;
+  l.destTotalCols = (int64_t) round(l.destTotalColsDec);
+  l.destTotalRows = (int64_t) round(l.destTotalRowsDec);
+  l.destTotalCols2 = (int64_t) round(mBaseTotalCols2 / l.magnifyX);
+  l.destTotalRows2 = (int64_t) round(mBaseTotalRows2 / l.magnifyY);
+  l.xScale=(double) l.srcTotalCols / (double) l.destTotalColsDec;
+  l.yScale=(double) l.srcTotalRows / (double) l.destTotalRowsDec;
+  l.xScaleReverse=(double) l.destTotalColsDec / (double) l.srcTotalCols;
+  l.yScaleReverse=(double) l.destTotalRowsDec / (double) l.srcTotalRows;
+
+  l.scaleMethodL2 = SAFEBMP_BEST_ENLARGE;
+  l.L2Size=l.readColsL2 * l.readRowsL2 * 3;
+  l.readOkL2=false;
+  if (l.fillin && l.L2Size > 0 && l.pBitmapL2)
+  {
+    l.readOkL2=true;
+    l.xScaleResize=(double) l.destTotalCols / (double) l.srcTotalColsL2;
+    l.yScaleResize=(double) l.destTotalRows / (double) l.srcTotalRowsL2;
+    if (l.xScaleResize < 1.0 || l.yScaleResize < 1.0)
+    {
+      l.scaleMethodL2=SAFEBMP_BEST_SHRINK;
+    }
+  }
+  l.xScaleL2=(double) l.srcTotalColsL2 / (double) l.srcTotalCols;
+  l.yScaleL2=(double) l.srcTotalRowsL2 / (double) l.srcTotalRows;
+  if (l.tiled)
+  {
+    l.finalOutputCols=256;
+    l.finalOutputRows=256;
+    l.finalOutputCols2=256;
+    l.finalOutputRows2=256;
+    l.inputTileCols=256;
+    l.inputTileRows=256;
+    l.grabColsA=(double) l.inputTileCols * l.xScale;
+    l.grabRowsA=(double) l.inputTileRows * l.yScale;
+    l.grabColsB=(double) l.finalOutputCols * l.xScale;
+    l.grabRowsB=(double) l.finalOutputRows * l.yScale;
+    l.grabColsL2=ceil(256.0 * (double) l.srcTotalColsL2 / (double) l.destTotalCols);
+    l.grabRowsL2=ceil(256.0 * (double) l.srcTotalRowsL2 / (double) l.destTotalRows);
+  }
+  else
+  {
+    l.finalOutputCols=(int) l.destTotalCols;
+    l.finalOutputRows=(int) l.destTotalRows;
+    l.finalOutputCols2=(int) l.destTotalCols2;
+    l.finalOutputRows2=(int) l.destTotalRows2;
+    l.inputTileCols=(int) l.destTotalCols2;
+    l.inputTileRows=(int) l.destTotalRows2;
+    l.grabColsA=(double) l.srcTotalCols;
+    l.grabRowsA=(double) l.srcTotalRows;
+    l.grabColsB=(double) l.srcTotalCols;
+    l.grabRowsB=(double) l.srcTotalRows;
+    l.grabColsL2=(double) l.srcTotalColsL2;
+    l.grabRowsL2=(double) l.srcTotalRowsL2;
+  }
+  l.totalSubTiles = 1;
+  int64_t totalGrabBytes = (int64_t) round(l.grabColsB) * (int64_t) round(l.grabRowsB) * 3;
+  if (totalGrabBytes > l.optMaxMem)
+  {
+    do
+    {
+      l.totalSubTiles *= 2;
+      totalGrabBytes = (int64_t) (ceil((double) l.grabColsB / (double) l.totalSubTiles) * ceil((double) l.grabRowsB / (double) l.totalSubTiles) * 3);
+    }
+    while (totalGrabBytes > l.optMaxMem);
+    std::cout << "Using max memory " << (totalGrabBytes / (1024 * 1024)) << "mb max cols=" << round(l.grabColsB) << " x rows=" << round(l.grabRowsB) << " for pixel resizer." << std::endl;
+    l.grabColsA = l.grabColsB / (double) l.totalSubTiles;
+    l.grabRowsA = l.grabRowsB / (double) l.totalSubTiles;
+  } 
+  if (l.center && l.optOutGoogle)
+  {
+    calcCenters(l.outLevel, l.xLevelOffset, l.yLevelOffset);
+  
+    l.xStartTile = l.xLevelOffset / 256;
+    l.xCenter = l.xLevelOffset % 256;
+    l.xStartSrc = (double)(-l.xCenter) * l.xScale;
+    l.outputLvlTotalCols = (int64_t) ceil((double) (l.xCenter + l.destTotalCols) / 256.0) * 256;
+
+    l.yTileMap = l.yLevelOffset / 256;
+    l.yCenter = l.yLevelOffset % 256;
+    l.yStartSrc = (double)(-l.yCenter) * l.yScale;
+    l.outputLvlTotalRows = (int64_t) ceil((double) (l.yCenter + l.destTotalRows) / 256.0) * 256;
+  }
+  else
+  {
+    l.xStartTile = 0;
+    l.xCenter = 0;
+    l.xStartSrc = 0.0;
+    
+    l.yTileMap = 0;
+    l.yCenter = 0;
+    l.yStartSrc = 0.0;
+    if (l.tiled)
+    {
+      l.outputLvlTotalCols = (int64_t) ceil((double) l.destTotalCols / l.inputTileCols) * l.inputTileCols;
+      l.outputLvlTotalRows = (int64_t) ceil((double) l.destTotalRows / l.inputTileRows) * l.inputTileRows;
+    }
+    else
+    {
+      l.outputLvlTotalCols = l.destTotalCols2;
+      l.outputLvlTotalRows = l.destTotalRows2;
+    } 
+  }
+  if (l.tiled)
+  {
+    l.xEndTile = (int64_t) ceil((double) l.outputLvlTotalCols / (double) l.inputTileCols);
+    l.yEndTile = (int64_t) ceil((double) l.outputLvlTotalRows / (double) l.inputTileRows);
+  }
+  else
+  {
+    l.xEndTile = 1;
+    l.yEndTile = 1;
+  }  
+
+  if (l.xScaleReverse < 1.0 || l.yScaleReverse < 1.0)
+  {
+    l.scaleMethod=SAFEBMP_BEST_SHRINK;    
+  }
+  else
+  {
+    l.scaleMethod=SAFEBMP_BEST_ENLARGE;
+  }
+}
+
+
+int SlideConvertor::outputLevel(int olympusLevel, int magnification, int outLevel, int options, int64_t readColsL2, int64_t readRowsL2, safeBmp *pBitmapL2)
+{
   SlideLevel l;
+  std::ostringstream output;
 
   memset(&l, 0, sizeof(l));
 
@@ -807,162 +1214,16 @@ int SlideConvertor::outputLevel(int olympusLevel, int magnification, int outLeve
   l.magnifyX=magnification;
   l.magnifyY=magnification;
   l.outLevel=outLevel;
-  l.readWidthL2 = readWidthL2;
-  l.readHeightL2 = readHeightL2;
+  l.readColsL2 = readColsL2;
+  l.readRowsL2 = readRowsL2;
   l.pBitmapL2 = pBitmapL2;
   l.bkgdColor=255;
-  #ifdef USE_OPENCV
-  l.scaleMethod=cv::INTER_CUBIC;
-  l.scaleMethodL2=cv::INTER_CUBIC;
-  #else
-  l.scaleMethod=Magick::MitchellFilter;
-  l.scaleMethodL2=Magick::MitchellFilter;
-  #endif
+
   l.xBlendFactor = l.magnifyX; 
   l.yBlendFactor = l.magnifyY;
   l.fillin = (mOptBlend && l.olympusLevel < 2) ? true : false;
 
-  l.srcTotalWidth = slide->getLevelWidth(olympusLevel);
-  l.srcTotalHeight = slide->getLevelHeight(olympusLevel);
-  if (l.fillin && slide->checkLevel(2))
-  {
-    l.srcTotalWidthL2 = slide->getLevelWidth(2);
-    l.srcTotalHeightL2 = slide->getLevelHeight(2);
-  }
-  else if (l.fillin && slide->checkLevel(3))
-  {
-    l.srcTotalWidthL2 = slide->getLevelWidth(3);
-    l.srcTotalHeightL2 = slide->getLevelHeight(3);
-  }
-  else
-  {
-    l.fillin = false;
-  }
-  l.destTotalWidthDec = (double) mBaseTotalWidth / (double) l.magnifyX;
-  l.destTotalHeightDec = (double) mBaseTotalHeight / (double) l.magnifyY;
-  l.destTotalWidth = (int64_t) round(l.destTotalWidthDec);
-  l.destTotalHeight = (int64_t) round(l.destTotalHeightDec);
-  l.destTotalWidth2 = (int64_t) round(mBaseTotalWidth2 / l.magnifyX);
-  l.destTotalHeight2 = (int64_t) round(mBaseTotalHeight2 / l.magnifyY);
-  l.xScale=(double) l.srcTotalWidth / (double) l.destTotalWidthDec;
-  l.yScale=(double) l.srcTotalHeight / (double) l.destTotalHeightDec;
-  l.xScaleReverse=(double) l.destTotalWidthDec / (double) l.srcTotalWidth;
-  l.yScaleReverse=(double) l.destTotalHeightDec / (double) l.srcTotalHeight;
-
-  l.L2Size=l.readWidthL2 * l.readHeightL2 * 3;
-  l.readOkL2=false;
-  if (l.fillin && l.L2Size > 0 && l.pBitmapL2)
-  {
-    l.readOkL2=true;
-    l.xScaleResize=(double) l.destTotalWidth / (double) l.srcTotalWidthL2;
-    l.yScaleResize=(double) l.destTotalHeight / (double) l.srcTotalHeightL2;
-    if (l.xScaleResize < 1.0 || l.yScaleResize < 1.0)
-    {
-      #ifdef USE_OPENCV
-      l.scaleMethodL2=cv::INTER_AREA;
-      #else
-      l.scaleMethodL2=Magick::LanczosFilter;
-      #endif
-    }
-  }
-  l.xScaleL2=(double) l.srcTotalWidthL2 / (double) l.srcTotalWidth;
-  l.yScaleL2=(double) l.srcTotalHeightL2 / (double) l.srcTotalHeight;
-  if (l.tiled)
-  {
-    l.finalOutputWidth=256;
-    l.finalOutputHeight=256;
-    l.finalOutputWidth2=256;
-    l.finalOutputHeight2=256;
-    l.inputTileWidth=256;
-    l.inputTileHeight=256;
-    l.grabWidthA=(double) l.inputTileWidth * l.xScale;
-    l.grabHeightA=(double) l.inputTileHeight * l.yScale;
-    l.grabWidthB=(double) l.finalOutputWidth * l.xScale;
-    l.grabHeightB=(double) l.finalOutputHeight * l.yScale;
-    l.grabWidthL2=ceil(256.0 * (double) l.srcTotalWidthL2 / (double) l.destTotalWidth);
-    l.grabHeightL2=ceil(256.0 * (double) l.srcTotalHeightL2 / (double) l.destTotalHeight);
-  }
-  else
-  {
-    l.finalOutputWidth=(int) l.destTotalWidth;
-    l.finalOutputHeight=(int) l.destTotalHeight;
-    l.finalOutputWidth2=(int) l.destTotalWidth2;
-    l.finalOutputHeight2=(int) l.destTotalHeight2;
-    l.inputTileWidth=(int) l.destTotalWidth2;
-    l.inputTileHeight=(int) l.destTotalHeight2;
-    l.grabWidthA=(double) l.srcTotalWidth;
-    l.grabHeightA=(double) l.srcTotalHeight;
-    l.grabWidthB=(double) l.srcTotalWidth;
-    l.grabHeightB=(double) l.srcTotalHeight;
-    l.grabWidthL2=(double) l.srcTotalWidthL2;
-    l.grabHeightL2=(double) l.srcTotalHeightL2;
-  }
-  l.totalSubTiles = 1;
-  int64_t totalGrabBytes = (int64_t) round(l.grabWidthB) * (int64_t) round(l.grabHeightB) * 3;
-  if (totalGrabBytes > l.optMaxMem)
-  {
-    do
-    {
-      l.totalSubTiles *= 2;
-      totalGrabBytes = (int64_t) (ceil((double) l.grabWidthB / (double) l.totalSubTiles) * ceil((double) l.grabHeightB / (double) l.totalSubTiles) * 3);
-    }
-    while (totalGrabBytes > l.optMaxMem);
-    std::cout << "Using max memory " << (totalGrabBytes / (1024 * 1024)) << "mb max width=" << round(l.grabWidthB) << " x height=" << round(l.grabHeightB) << " for pixel resizer." << std::endl;
-    l.grabWidthA = l.grabWidthB / (double) l.totalSubTiles;
-    l.grabHeightA = l.grabHeightB / (double) l.totalSubTiles;
-  } 
-  if (l.center && l.optOutGoogle)
-  {
-    calcCenters(l.outLevel, l.xLevelOffset, l.yLevelOffset);
-  
-    l.xStartTile = l.xLevelOffset / 256;
-    l.xCenter = l.xLevelOffset % 256;
-    l.xStartSrc = (double)(-l.xCenter) * l.xScale;
-    l.outputLvlTotalWidth = (int64_t) ceil((double) (l.xCenter + l.destTotalWidth) / 256.0) * 256;
-
-    l.yTileMap = l.yLevelOffset / 256;
-    l.yCenter = l.yLevelOffset % 256;
-    l.yStartSrc = (double)(-l.yCenter) * l.yScale;
-    l.outputLvlTotalHeight = (int64_t) ceil((double) (l.yCenter + l.destTotalHeight) / 256.0) * 256;
-  }
-  else
-  {
-    l.xStartTile = 0;
-    l.xCenter = 0;
-    l.xStartSrc = 0.0;
-    
-    l.yTileMap = 0;
-    l.yCenter = 0;
-    l.yStartSrc = 0.0;
-    if (l.tiled)
-    {
-      l.outputLvlTotalWidth = (int64_t) ceil((double) l.destTotalWidth / l.inputTileWidth) * l.inputTileWidth;
-      l.outputLvlTotalHeight = (int64_t) ceil((double) l.destTotalHeight / l.inputTileHeight) * l.inputTileHeight;
-    }
-    else
-    {
-      l.outputLvlTotalWidth = l.destTotalWidth2;
-      l.outputLvlTotalHeight = l.destTotalHeight2;
-    } 
-  }
-  if (l.tiled)
-  {
-    l.xEndTile = (int64_t) ceil((double) l.outputLvlTotalWidth / (double) l.inputTileWidth);
-    l.yEndTile = (int64_t) ceil((double) l.outputLvlTotalHeight / (double) l.inputTileHeight);
-  }
-  else
-  {
-    l.xEndTile = 1;
-    l.yEndTile = 1;
-  }  
-  if (l.xScaleReverse < 1.0 || l.yScaleReverse < 1.0)
-  {
-    #ifdef USE_OPENCV
-    l.scaleMethod=cv::INTER_AREA;
-    #else
-    l.scaleMethod=Magick::LanczosFilter;
-    #endif
-  }
+  calcTilesPrep(l);
   // Get the quality from the composite level (this does work as long as
   // the ini file specifies it (some ini files do, some don't)
   // Make sure the quality is at minimum the quality specific on the
@@ -1005,38 +1266,29 @@ int SlideConvertor::outputLevel(int olympusLevel, int magnification, int outLeve
       }
     }
     std::string strAttributes=oss.str();
-    if (mTif->setAttributes(3, 8, (int) l.destTotalWidth2, (int) l.destTotalHeight2, (l.tiled==true ? l.finalOutputWidth : 0), (l.tiled==true ? l.finalOutputHeight : 0), 1, l.optQuality)==false || mTif->setDescription(strAttributes, (int) mBaseTotalWidth2, (int) mBaseTotalHeight2)==false)
+    if (mTif->setAttributes(3, 8, (int) l.destTotalCols2, (int) l.destTotalRows2, (l.tiled==true ? l.finalOutputCols : 0), (l.tiled==true ? l.finalOutputRows : 0), 1, l.optQuality)==false || mTif->setDescription(strAttributes, (int) mBaseTotalCols2, (int) mBaseTotalRows2)==false)
     {
-      std::string errMsg;
       mTif->getErrMsg(errMsg);
       std::cerr << "Failed to write tif attributes: " << errMsg << std::endl; 
       return 4;
     }
   }
-  bool error=false;
+  l.error=false;
   time_t timeStart=0, timeLast=0;
-  #ifdef USE_MAGICK
-  l.magickWand = Magick::NewMagickWand();
-  Magick::MagickSetCompression(l.magickWand, Magick::NoCompression);
-  Magick::MagickSetImageType(l.magickWand, Magick::TrueColorType);
-  Magick::MagickSetImageDepth(l.magickWand, 8);
-  Magick::MagickSetImageAlphaChannel(l.magickWand, Magick::OffAlphaChannel);
-  l.pixelWand = Magick::NewPixelWand();
-  Magick::PixelSetColor(l.pixelWand, "#ffffff");
-  #endif
+  l.pZoomRes = safeBmpZoomResInit();
   try
   {
-    safeBmpClear(&l.bitmap1);
+    safeBmpClear(&l.wholeTile);
     if (l.totalSubTiles > 1)
     {
-      safeBmpAlloc2(&l.bitmap1, l.inputTileWidth, l.inputTileHeight);
+      safeBmpAlloc2(&l.wholeTile, l.inputTileCols, l.inputTileRows);
     }
-    l.pBitmap4 = safeBmpAlloc(l.finalOutputWidth2, l.finalOutputHeight2);
+    l.pBitmapBlended = safeBmpAlloc(l.finalOutputCols2, l.finalOutputRows2);
     if (l.readOkL2 && l.optInOlympusIni && l.optBlend)
     {
       if (mTotalYSections == 0)
       {
-        mTotalYSections = mBaseActualHeight2;
+        mTotalYSections = mBaseActualRows2;
         mySubSections=new BlendSection*[mTotalYSections];
         memset(mySubSections, 0, mTotalYSections*sizeof(BlendSection*));
         for (int64_t y = 0; y < mTotalYSections; y++)
@@ -1055,8 +1307,8 @@ int SlideConvertor::outputLevel(int olympusLevel, int magnification, int outLeve
     if (l.optLog)
     {
       *logFile << " xScale=" << l.xScale << " yScale=" << l.yScale;
-      *logFile << " srcTotalWidth=" << l.srcTotalWidth << " srcTotalHeight=" << l.srcTotalHeight;
-      *logFile << " destTotalWidth=" << l.destTotalWidth << " destTotalHeight=" << l.destTotalHeight;
+      *logFile << " srcTotalCols=" << l.srcTotalCols << " srcTotalRows=" << l.srcTotalRows;
+      *logFile << " destTotalCols=" << l.destTotalCols << " destTotalRows=" << l.destTotalRows;
       *logFile << std::endl;
     }
     if (l.optDebug > 1)
@@ -1069,7 +1321,6 @@ int SlideConvertor::outputLevel(int olympusLevel, int magnification, int outLeve
     
     l.perc=0, l.percOld=0;
     l.onePercHit=false;
-    bool error=false;
     timeStart = time(NULL);
     l.ySrc=l.yStartSrc;
     
@@ -1079,331 +1330,9 @@ int SlideConvertor::outputLevel(int olympusLevel, int magnification, int outLeve
     // Keep looping until the current composite pyramid level is read
     // or the resulting output pyramid is done or on error
     l.yOutTile = 0;
-    while (l.yOutTile < l.yEndTile && round(l.ySrc) < l.srcTotalHeight)
+    while (l.yOutTile < l.yEndTile && round(l.ySrc) < l.srcTotalRows && l.error == false)
     {
-      std::ostringstream yRootStream, yRootStreamZip;
-      std::string dirPart1, dirPartZip1;
-      std::string dirPart2, dirPartZip2;
-      std::string yRoot, yRootZip;
-      
-      yRootStream << mFileNameOnly;
-      dirPart1 = yRootStream.str();
-      yRootStream << mPathSeparator << outLevel;
-      dirPart2 = yRootStream.str();
-      yRootStream << mPathSeparator << l.yTileMap;
-      yRoot = yRootStream.str();
-      if (l.optDebug > 1)
-      {
-        // Create the google maps directory structure up to the the y tile
-        if (!my_mkdir(dirPart1) || !my_mkdir(dirPart2) || !my_mkdir(yRoot))
-        {
-          std::cerr << "Failed to add create directory '" << yRoot << "'. Stopping!" << std::endl;
-          error = true;
-          break;
-        }
-      }
-      yRootStreamZip << mFileNameOnly;
-      dirPartZip1 = yRootStreamZip.str();
-      yRootStreamZip << ZipFile::mZipPathSeparator << outLevel;
-      dirPartZip2 = yRootStreamZip.str();
-      yRootStreamZip << ZipFile::mZipPathSeparator << l.yTileMap;
-      yRootZip = yRootStreamZip.str();
-      if (l.optOutGoogle) 
-      {
-        // Create the google maps directory structure up to the the y tile
-        if (mZip->addDir(dirPartZip1)==-1 || mZip->addDir(dirPartZip2)==-1 || mZip->addDir(yRootZip)==-1)
-        {
-          std::cerr << "Failed to add zip directory '" << yRoot << "' to archive. Reason: " << mZip->getErrorMsg() << std::endl << "Stopping!" << std::endl;
-          error = true;
-          break;
-        }
-      }
-      l.ySrc = (l.yOutTile * l.grabHeightB) + l.yStartSrc;
-      l.xSrc = l.xStartSrc;
-      l.xDest = 0;
-      l.xTileMap = l.xStartTile;
-      if (round(l.ySrc) + round(l.grabHeightB) < 1.0f)
-      {
-        std::cerr << "For some reason we have hit this! l.ySrc=" << l.ySrc << " l.yStartSrc=" << l.yStartSrc << " l.grabHeightB=" << l.grabHeightB << std::endl;
-        l.yOutTile++;
-        continue;
-      }
-      for (l.xOutTile=0; l.xOutTile < l.xEndTile && round(l.xSrc) < l.srcTotalWidth && error==false; l.xOutTile++) 
-      {
-        std::ostringstream tileNameStream, tileNameStreamZip;
-        std::string errMsg;
-        std::string fullTilePath;
-        l.xSrc = (l.xOutTile * l.grabWidthB) + l.xStartSrc;
-        if (round(l.xSrc) + round(l.grabWidthB) < 1.0f)
-        {
-          std::cerr << "For some reason we have hit this! l.xSrc=" << l.xSrc << " l.xStartSrc=" << l.xStartSrc << " l.grabWidthB=" << l.grabWidthB << std::endl;
-          continue;
-        }
-        tileNameStream << yRoot << mPathSeparator << l.xTileMap << ".jpg";
-        tileNameStreamZip << yRootZip << ZipFile::mZipPathSeparator << l.xTileMap << ".jpg";
-        fullTilePath = tileNameStream.str();
-        l.pTileName = &fullTilePath;
-        l.inputSubTileWidthRead = (int64_t) round((double) l.inputTileWidth / (double) l.totalSubTiles);
-        l.inputSubTileHeightRead = (int64_t) round((double) l.inputTileHeight / (double) l.totalSubTiles);
-        bool readOkSrc=false;
-        int readSubTiles=0;
-        if (l.totalSubTiles > 1)
-        {
-          safeBmpByteSet(&l.bitmap1, l.bkgdColor);
-        }
-        l.pBitmapSrc = NULL;
-        double xSrcStart2=l.xSrc;
-        double ySrcStart2=l.ySrc;
-
-        safeBmpClear(&l.preOrientBitmap);
-        safeBmpClear(&l.subTileBitmap);
-        safeBmpClear(&l.safeImgScaled);
-        safeBmpClear(&l.sizedBitmap);
-        safeBmpClear(&l.sizedBitmap2);
-        l.pImgScaled = NULL;
-        // this tile needs to be the same with and length as final output width and length
-        l.ySubTile=0;
-        while (l.ySubTile < l.totalSubTiles && round(l.ySrc) < l.srcTotalHeight)
-        {
-          l.xSrc = xSrcStart2;
-          l.ySrc = ySrcStart2 + (l.ySubTile * l.grabHeightA);
-          if (round(l.ySrc) + round(l.grabHeightA) < 1.0f) 
-          {
-            l.ySubTile++;
-            continue;
-          }
-          for (l.xSubTile=0; l.xSubTile < l.totalSubTiles && round(l.xSrc) < l.srcTotalWidth; l.xSubTile++)
-          {
-            l.xSrc = xSrcStart2 + (l.xSubTile * l.grabWidthA);
-            if (round(l.xSrc) + round(l.grabWidthA) < 1.0f) continue;
-            safeBmpClear(&l.preOrientBitmap);
-            safeBmpClear(&l.subTileBitmap);
-            safeBmpClear(&l.safeImgScaled);
-            safeBmpClear(&l.sizedBitmap);
-            safeBmpClear(&l.sizedBitmap2);
-            l.pImgScaled = NULL;
-            
-            l.xSrcRead = l.xSrc;
-            l.ySrcRead = l.ySrc;
-            double grabWidthReadDec = l.grabWidthA;
-            double grabHeightReadDec = l.grabHeightA;
-            l.inputSubTileWidthRead = (int64_t) round((double) l.inputTileWidth / (double) l.totalSubTiles);
-            l.inputSubTileHeightRead = (int64_t) round((double) l.inputTileHeight / (double) l.totalSubTiles);
-            l.xMargin = 0;
-            l.yMargin = 0;
-            if (l.xSrc < 0.0)
-            {
-              grabWidthReadDec=l.grabWidthA + l.xSrc;
-              l.xSrcRead = 0.0;
-              l.xMargin = l.xCenter - (l.xSubTile * l.inputSubTileWidthRead);
-            }
-            if (l.ySrc < 0.0)
-            {
-              grabHeightReadDec=l.grabHeightA + l.ySrc;
-              l.ySrcRead = 0.0;
-              l.yMargin = l.yCenter - (l.ySubTile * l.inputSubTileHeightRead);
-            }
-            if (l.xSrcRead + grabWidthReadDec > (double) l.srcTotalWidth)
-            {
-              grabWidthReadDec = (double) l.srcTotalWidth - l.xSrcRead;
-              l.inputSubTileWidthRead = (int64_t) round(grabWidthReadDec * l.xScaleReverse);
-            }
-            if (l.ySrcRead + grabHeightReadDec > (double) l.srcTotalHeight)
-            {
-              grabHeightReadDec = (double) l.srcTotalHeight - l.ySrcRead;
-              l.inputSubTileHeightRead = (int64_t) round(grabHeightReadDec * l.yScaleReverse);
-            }
-            if (l.xSrc < 0.0 || l.ySrc < 0.0)
-            {
-              l.inputSubTileWidthRead = (int64_t) round(grabWidthReadDec * l.xScaleReverse);
-              l.inputSubTileHeightRead = (int64_t) round(grabHeightReadDec * l.yScaleReverse);
-            }
-            l.grabWidthRead = (int64_t) round(grabWidthReadDec);
-            l.grabHeightRead = (int64_t) round(grabHeightReadDec);
-            if (l.grabWidthRead <= 0 || l.grabHeightRead <= 0) continue;
-            bool allocOk = slide->allocate(&l.subTileBitmap, olympusLevel, (int64_t) round(l.xSrcRead), (int64_t) round(l.ySrcRead), l.grabWidthRead, l.grabHeightRead, false);
-            if (allocOk == false) continue; 
-            if (mOrientation == 0)
-            {
-              l.xSrcPreOrient = l.xSrcRead;
-              l.ySrcPreOrient = l.ySrcRead;
-              l.widthPreOrient = l.grabWidthRead;
-              l.heightPreOrient = l.grabHeightRead;
-            }
-            else if (mOrientation == 90)
-            {
-              l.xSrcPreOrient = l.ySrcRead;
-              l.ySrcPreOrient = ((double) l.srcTotalWidth - l.xSrcRead) - (double) l.grabWidthRead;
-              l.widthPreOrient = l.grabHeightRead;
-              l.heightPreOrient = l.grabWidthRead;
-            }
-            else if (mOrientation == -90 || mOrientation == 270)
-            {
-              l.xSrcPreOrient = ((double) l.srcTotalHeight - l.ySrcRead) - (double) l.grabHeightRead;
-              l.ySrcPreOrient = l.xSrcRead;
-              l.widthPreOrient = l.grabHeightRead;
-              l.heightPreOrient = l.grabWidthRead;
-            }
-            else if (mOrientation == 180)
-            {
-              l.xSrcPreOrient = ((double) l.srcTotalWidth - l.xSrcRead) - (double) l.grabWidthRead;
-              l.ySrcPreOrient = ((double) l.srcTotalHeight - l.ySrcRead) - (double) l.grabHeightRead;
-              l.widthPreOrient = l.grabWidthRead;
-              l.heightPreOrient = l.grabHeightRead;
-            }
-            if (mOrientation == 0)
-            {
-              l.pPreOrientBitmap = &l.subTileBitmap;
-            }
-            else
-            {
-              allocOk = slide->allocate(&l.preOrientBitmap, olympusLevel, (int64_t) round(l.xSrcPreOrient), (int64_t) round(l.ySrcPreOrient), l.widthPreOrient, l.heightPreOrient, true);
-              if (allocOk == false) continue; 
-              l.pPreOrientBitmap = &l.preOrientBitmap;
-              safeBmpByteSet(&l.preOrientBitmap, l.bkgdColor);
-            }
-            l.pBitmapSrc = &l.subTileBitmap;
-            l.pBitmapFinal = &l.subTileBitmap;
-            safeBmpByteSet(&l.subTileBitmap, l.bkgdColor);
-            
-            l.readWidth=0;
-            l.readHeight=0;
-            if (l.pBitmapSrc->data == NULL)
-            {
-              error = true;
-              break;
-            }
-            if (l.optDebug > 2)
-            {
-              *logFile << " slide->read(x=" << l.xSrcPreOrient << " y=" << l.ySrcPreOrient << " grabWidthA=" << l.widthPreOrient << " grabHeightA=" << l.heightPreOrient << " olympusLevel=" << l.olympusLevel << "); " << std::endl;
-            }
-            if (l.magnifyX == 1) {
-              output << ".";
-            }
-            readOkSrc = slide->read(l.pPreOrientBitmap, l.olympusLevel, l.readDirection, l.readZLevel, (int64_t) round(l.xSrcPreOrient), (int64_t) round(l.ySrcPreOrient), l.widthPreOrient, l.heightPreOrient, &l.preOrientResultWidth, &l.preOrientResultHeight);
-            if (readOkSrc)
-            {
-              readSubTiles++;
-            }
-            else
-            {
-              std::cerr << "Failed to read level " << l.olympusLevel << " tile @ x=" << l.xSrcPreOrient << " y=" << l.ySrcPreOrient << " width=" << l.widthPreOrient << " height=" << l.heightPreOrient << std::endl;
-            }
-            if (l.optDebug > 2)
-            {
-              std::cout << "readWidth: " << l.preOrientResultWidth << " readHeight: " << l.preOrientResultHeight<< " grabWidth: " << l.widthPreOrient << " grabHeight: " << l.heightPreOrient << std::endl;
-            }
-            if (readOkSrc)
-            {
-              if (l.optDebug > 2)
-              {
-                std::stringstream ss;
-                ss << "vmslideconv.a" << mPathSeparator << "a" << l.olympusLevel << "y" << l.ySrcPreOrient << "x" << l.xSrcPreOrient << ".jpg";
-                std::string fname = ss.str();
-                std::string errMsg;
-                my_jpeg_write(fname, l.pPreOrientBitmap->data, (int) l.preOrientResultWidth, (int) l.preOrientResultHeight, 90, &errMsg);
-              }
-              processSrcTile(l);
-            }
-            safeBmpFree(&l.preOrientBitmap);
-            safeBmpFree(&l.safeImgScaled);
-            safeBmpFree(&l.sizedBitmap);
-            if (l.pImgScaled && l.totalSubTiles > 1)
-            {
-              #ifdef USE_OPENCV
-              l.pImgScaled->release();
-              delete l.pImgScaled;
-              #else
-              safeBmpFree(l.pImgScaled);
-              #endif
-              l.pImgScaled = 0;
-              safeBmpFree(&l.subTileBitmap);
-            }
-            l.xSrc += l.grabWidthA;
-          }
-          l.ySubTile++;
-          l.ySrc = ySrcStart2 + (l.ySubTile * l.grabHeightA);
-          printPercDone(l);
-        }
-        l.xSrc = xSrcStart2;
-        l.ySrc = ySrcStart2;
-        l.xSrcRead = l.xSrc;
-        l.ySrcRead = l.ySrc;
-        safeBmpClear(&l.safeScaledL2Mini);
-        safeBmpClear(&l.safeScaledL2Mini2);
-        l.pImgScaledL2Mini = NULL;
-        if (readSubTiles > 0) 
-        {
-          bool writeOk=false;
-          if (l.readOkL2 && l.optBlend)
-          {
-            blendL2WithSrc(l);  
-          }
-          if (l.optUseGamma)
-          {
-            processGamma(l);
-          }
-          if (l.optOutGoogle)
-          {
-            BYTE* pJpegBytes = NULL;
-            unsigned long outSize = 0;
-            std::string tileName = tileNameStreamZip.str();
-            bool compressOk=my_jpeg_compress(&pJpegBytes, l.pBitmapFinal->data, (int) l.pBitmapFinal->width, (int) l.pBitmapFinal->height, l.optQuality, &errMsg, &outSize);
-            if (compressOk && mZip->addFile(tileName, pJpegBytes, outSize)==OLY_ZIP_OK)
-            {
-              writeOk=true;
-            }
-            else
-            {
-              error=true;
-            }
-            my_jpeg_free(&pJpegBytes);
-          }
-          else if (l.optOutTif)
-          {
-            if (l.tiled)
-            {
-              writeOk=mTif->writeEncodedTile(l.pBitmapFinal->data, (unsigned int) l.xDest, (unsigned int) l.yDest, 1);
-            }
-            else
-            {
-              std::stringstream ss;
-              ss << "vmslideconv.l" << mPathSeparator << "l" << l.olympusLevel << "mag" << l.magnifyX << ".jpg";
-              std::string fname = ss.str();
-              std::string errMsg;
-              my_jpeg_write(fname, l.pBitmapFinal->data, (int) l.pBitmapFinal->width, (int) l.pBitmapFinal->height, 90, &errMsg); 
-              writeOk=mTif->writeImage(l.pBitmapFinal->data);
-            }
-          }
-          if (writeOk==false)
-          {
-            std::string errMsg;
-            if (l.optOutGoogle)
-            {
-              std::cerr << "Failed to write jpeg tile '" << *l.pTileName << "' reason: " << mZip->getErrorMsg() << std::endl;
-            }
-            else if (l.optOutTif && l.tiled)
-            {
-              mTif->getErrMsg(errMsg);
-              std::cerr << "Failed to write tif tile x=" << l.xDest << " y=" << l.yDest << " reason: " << errMsg << std::endl;
-            }
-            else if (l.optOutTif && !l.tiled)
-            {
-              mTif->getErrMsg(errMsg);
-              std::cerr << "Failed to write tif image at tif level=" << l.outLevel << " reason: " << errMsg << std::endl;
-            }
-            error = true;
-          }
-        }
-        tileCleanup(l);
-        l.xDest += l.finalOutputWidth2;
-        l.xTileMap++;
-      }
-      l.yDest += l.finalOutputHeight2;
-      l.yTileMap++;
-      l.yOutTile++;
-      l.ySrc = (l.yOutTile * l.grabHeightB) + l.yStartSrc;
-      printPercDone(l);
+      outputNextRow(l);
     }
     if (l.optOutTif)
     {
@@ -1411,75 +1340,64 @@ int SlideConvertor::outputLevel(int olympusLevel, int magnification, int outLeve
       if (success == false)
       {
         const char *tifDirErrorMsg = "Fatal Error: Failed to write tif directory: ";
-        std::string errMsg;
         mTif->getErrMsg(errMsg);
         std::cerr << tifDirErrorMsg << errMsg << std::endl;
         if (l.optLog) *logFile << tifDirErrorMsg << errMsg << std::endl;
-        error = true;
+        l.error = true;
       }
     }
   }
   catch (std::bad_alloc& ba)
   {
-    const char *msg = "Fatal Error: Failed to get memory. Cannot continue!";
+    (void) ba;
+    const char *msg = "Fatal Error: Failed to allocate memory! Cannot continue!";
     std::cout << msg << std::endl;
     if (l.optLog) *logFile << msg << std::endl;
-    error = true;
+    l.error = true;
     exit(1);
   }
-  safeBmpFree(l.pBitmap4);
-  safeBmpFree(&l.bitmap1);
-  #ifdef USE_MAGICK
-  if (l.magickWand) 
-  {
-    Magick::DestroyMagickWand(l.magickWand);
-    l.magickWand = NULL;
-  }
-  if (l.pixelWand)
-  {
-    Magick::DestroyPixelWand(l.pixelWand);
-    l.pixelWand = NULL;
-  }
-  #endif
-  l.pBitmap4 = NULL;
+  safeBmpFree(l.pBitmapBlended);
+  safeBmpFree(&l.wholeTile);
+  safeBmpZoomResFree(l.pZoomRes);
+  l.pBitmapBlended = NULL;
   timeLast = time(NULL);
-  if (error==false)
+  if (l.error==false)
   {
     std::cout << "Took " << timeLast - timeStart << " seconds for this level." << std::endl;
   }
-  return (error==true ? 1 : 0); 
+  return (l.error==true ? 1 : 0); 
 }
 
 
-int SlideConvertor::checkFullL2(int64_t *pReadWidthL2, int64_t *pReadHeightL2, safeBmp **pFullL2)
+int SlideConvertor::checkFullL2(int64_t *pReadColsL2, int64_t *pReadRowsL2, safeBmp **pFullL2)
 {
   *pFullL2 = NULL;
-  *pReadWidthL2=0;
-  *pReadHeightL2=0;
+  *pReadColsL2=0;
+  *pReadRowsL2=0;
 
-  int64_t srcTotalWidthL2 = 0;
-  int64_t srcTotalHeightL2 = 0;
+  int64_t srcTotalColsL2 = 0;
+  int64_t srcTotalRowsL2 = 0;
   if (slide->checkLevel(2))
   {
-    srcTotalWidthL2 = slide->getLevelWidth(2);
-    srcTotalHeightL2 = slide->getLevelHeight(2);
+    srcTotalColsL2 = slide->getLevelCols(2);
+    srcTotalRowsL2 = slide->getLevelRows(2);
   }
   else if (slide->checkLevel(3))
   {
-    srcTotalWidthL2 = slide->getLevelWidth(3);
-    srcTotalHeightL2 = slide->getLevelHeight(3);
+    srcTotalColsL2 = slide->getLevelCols(3);
+    srcTotalRowsL2 = slide->getLevelRows(3);
   }
   else
   {
     return 1;
   }
 
-  if (srcTotalWidthL2 <= 0 || srcTotalHeightL2 <= 0) return 1;
+  if (srcTotalColsL2 <= 0 || srcTotalRowsL2 <= 0) return 1;
   if (!mpImageL2) return 2;
-  if (mpImageL2->width > 0 && mpImageL2->height > 0 && mpImageL2->data) 
+  if (mpImageL2->cols > 0 && mpImageL2->rows > 0 && mpImageL2->data) 
   {
-    *pReadWidthL2 = mpImageL2->width;
-    *pReadHeightL2 = mpImageL2->height;
+    *pReadColsL2 = mpImageL2->cols;
+    *pReadRowsL2 = mpImageL2->rows;
     *pFullL2 = mpImageL2;
     return 0;
   }
@@ -1491,14 +1409,14 @@ int SlideConvertor::convert2Tif()
 {
   int error = 0;
   safeBmp* pFullL2Bitmap = 0; 
-  int64_t readWidthL2 = 0;
-  int64_t readHeightL2 = 0;
+  int64_t readColsL2 = 0;
+  int64_t readRowsL2 = 0;
  
   if (mValidObject == false) return 1;
  
   if (mOptBlend)
   {
-    int status = checkFullL2(&readWidthL2, &readHeightL2, &pFullL2Bitmap);
+    int status = checkFullL2(&readColsL2, &readRowsL2, &pFullL2Bitmap);
     switch (status)
     {
       case 0:
@@ -1517,7 +1435,7 @@ int SlideConvertor::convert2Tif()
     }
   }
   int maxDivisor=128;
-  while (maxDivisor > 16 && (mBaseTotalWidth / maxDivisor < 2000 && mBaseTotalHeight / maxDivisor < 2000)) 
+  while (maxDivisor > 16 && (mBaseTotalCols / maxDivisor < 2000 && mBaseTotalRows / maxDivisor < 2000)) 
   {
     maxDivisor /= 2;
   }; 
@@ -1572,7 +1490,7 @@ int SlideConvertor::convert2Tif()
         break;
     }
     options = LEVEL_TILED * tiled;
-    error=outputLevel(olympusLevel, divisor, step, options, readWidthL2, readHeightL2, pFullL2Bitmap);
+    error=outputLevel(olympusLevel, divisor, step, options, readColsL2, readRowsL2, pFullL2Bitmap);
     step++;
   }
   if (error == 0 && step > 1)
@@ -1583,19 +1501,18 @@ int SlideConvertor::convert2Tif()
 }
 
 
-
 int SlideConvertor::convert2Gmap()
 {
   int error = 0;
   safeBmp* pFullL2Bitmap = 0; 
-  int64_t readWidthL2 = 0;
-  int64_t readHeightL2 = 0;
+  int64_t readColsL2 = 0;
+  int64_t readRowsL2 = 0;
   
   if (mValidObject == false) return 4;
 
   if (mOptBlend)
   {
-    int status = checkFullL2(&readWidthL2, &readHeightL2, &pFullL2Bitmap);
+    int status = checkFullL2(&readColsL2, &readRowsL2, &pFullL2Bitmap);
     switch (status)
     {
       case 0:
@@ -1640,7 +1557,7 @@ int SlideConvertor::convert2Gmap()
         if (slide->checkLevel(olympusLevel)) break;
       }
     }
-    error=outputLevel(olympusLevel, divisor, outLevel, LEVEL_TILED, readWidthL2, readHeightL2, pFullL2Bitmap);
+    error=outputLevel(olympusLevel, divisor, outLevel, LEVEL_TILED, readColsL2, readRowsL2, pFullL2Bitmap);
     divisor /= 2;
     outLevel++;
   }
@@ -1652,7 +1569,7 @@ int SlideConvertor::convert2Gmap()
 }
 
 
-int SlideConvertor::open(std::string inputFile, std::string outputFile, std::string hostname, int options, int orientation, int64_t optXOffset, int64_t optYOffset)
+int SlideConvertor::open(std::string inputFile, std::string outputFile, std::string hostname, int options, int orientation)
 {
   mValidObject = false;
   closeRelated();
@@ -1664,7 +1581,6 @@ int SlideConvertor::open(std::string inputFile, std::string outputFile, std::str
   mOrientation = orientation;
   mOptLog = options & CONV_LOG;
   mOptBlend = options & CONV_BLEND;
-  mOptZStack = options & CONV_ZSTACK;
   int optOutJson = options & CONV_OUT_JSON;
   if (mOptLog)
   {
@@ -1676,7 +1592,7 @@ int SlideConvertor::open(std::string inputFile, std::string outputFile, std::str
     std::cerr << "Fatal Error: Input file or directory '" << inputFile << "' not found!" << std::endl;
     return 1;
   }
-  if (S_ISDIR(statBuf.st_mode))
+  if ((statBuf.st_mode & S_IFDIR))
   {
     mOptInOlympusIni = true;
     mOptInAperioSvs = false;
@@ -1737,9 +1653,13 @@ int SlideConvertor::open(std::string inputFile, std::string outputFile, std::str
     mOptBlend = false;
   }  
   errMsg="";
-  if (slide->open(inputFile.c_str(), options, orientation, mOptDebug, optXOffset, optYOffset, &mpImageL2)==false)
+  if (slide->open(inputFile.c_str(), options, mOptDebug)==false)
   {
     return 1;
+  }
+  if (mOptInOlympusIni && mOptBlend && slide->checkLevel(2))
+  {
+    mpImageL2 = slide->loadFullImage(2, orientation, 1.0, 1.0, false, mOptDebug, *logFile);
   }
   slide->setXYSwitched(orientation);
   mOutputFile = outputFile;
@@ -1799,14 +1719,14 @@ int SlideConvertor::open(std::string inputFile, std::string outputFile, std::str
   {
     if (slide->checkLevel(mBaseLevel))
     {
-      mBaseTotalWidth = slide->getLevelWidth(mBaseLevel);
-      mBaseTotalHeight = slide->getLevelHeight(mBaseLevel);
-      mBaseTotalWidth2 = (int64_t) ceil((double) mBaseTotalWidth / (double) 256.0) * 256;
-      mBaseTotalHeight2 = (int64_t) ceil((double) mBaseTotalHeight / (double) 256.0) * 256;
-      mBaseActualWidth = slide->getActualWidth(mBaseLevel);
-      mBaseActualHeight = slide->getActualHeight(mBaseLevel);
-      mBaseActualWidth2 = (int64_t) ceil((double) mBaseActualWidth / (double) 256.0) * 256;
-      mBaseActualHeight2 = (int64_t) ceil((double) mBaseActualHeight / (double) 256.0) * 256;
+      mBaseTotalCols = slide->getLevelCols(mBaseLevel);
+      mBaseTotalRows = slide->getLevelRows(mBaseLevel);
+      mBaseTotalCols2 = (int64_t) ceil((double) mBaseTotalCols / (double) 256.0) * 256;
+      mBaseTotalRows2 = (int64_t) ceil((double) mBaseTotalRows / (double) 256.0) * 256;
+      mBaseActualCols = slide->getActualCols(mBaseLevel);
+      mBaseActualRows = slide->getActualRows(mBaseLevel);
+      mBaseActualCols2 = (int64_t) ceil((double) mBaseActualCols / (double) 256.0) * 256;
+      mBaseActualRows2 = (int64_t) ceil((double) mBaseActualRows / (double) 256.0) * 256;
       break;
     }
   }
@@ -1815,8 +1735,8 @@ int SlideConvertor::open(std::string inputFile, std::string outputFile, std::str
   mMaxSide = 0;
   mTopOutLevel = 0;
   
-  std::cout << "baseTotalWidth=" << mBaseTotalWidth << " baseTotalHeight=" << mBaseTotalHeight << std::endl;
-  if (mBaseTotalWidth > 0 && mBaseTotalHeight > 0)
+  std::cout << "baseTotalCols=" << mBaseTotalCols << " baseTotalRows=" << mBaseTotalRows << std::endl;
+  if (mBaseTotalCols > 0 && mBaseTotalRows > 0)
   {
     mValidObject = true;
     if (mOptOutGoogle)
@@ -1824,7 +1744,7 @@ int SlideConvertor::open(std::string inputFile, std::string outputFile, std::str
       for (mTopOutLevel = 0; mTopOutLevel < 20; mTopOutLevel++)
       {
         mMaxSide = (1 << mTopOutLevel) * 256;
-        if (mMaxSide >= mBaseTotalWidth && mMaxSide >= mBaseTotalHeight)
+        if (mMaxSide >= mBaseTotalCols && mMaxSide >= mBaseTotalRows)
         {
           std::cout << "Total Google Maps Levels: " << mTopOutLevel << " (because 2^" << mTopOutLevel << "*256=" << mMaxSide << ") " << std::endl;
           break;
@@ -1837,7 +1757,10 @@ int SlideConvertor::open(std::string inputFile, std::string outputFile, std::str
     std::ofstream jsonFile;
     std::string jsonName = outputFile;
     std::size_t dot_index2 = jsonName.find_last_of(".");
-    jsonName.erase(dot_index2);
+    if (dot_index2 != std::string::npos)
+    {
+      jsonName.erase(dot_index2);
+    }
     jsonName.append(".json");
     jsonFile.open(jsonName.c_str());
     if (jsonFile.is_open())
@@ -1847,8 +1770,8 @@ int SlideConvertor::open(std::string inputFile, std::string outputFile, std::str
       {
         jsonFile << "{" << std::endl;
         jsonFile << "  " << "\"slideUrlFormat\": \"" << hostname << mFileNameOnly << "/{z}/{y}/{x}.jpg\"," << std::endl;
-        jsonFile << "  " << "\"width\": \"" << mBaseTotalWidth << "\"," << std::endl;
-        jsonFile << "  " << "\"height\": \"" << mBaseTotalHeight << "\"," << std::endl;
+        jsonFile << "  " << "\"cols\": \"" << mBaseTotalCols << "\"," << std::endl;
+        jsonFile << "  " << "\"rows\": \"" << mBaseTotalRows << "\"," << std::endl;
         jsonFile << "  " << "\"levels\": \"" << mTopOutLevel << "\"," << std::endl;
         jsonFile << "  " << "\"slideDepth\": \"" << slide->getMagStr() << "\"," << std::endl;
         jsonFile << "  " << "\"description\": \"" << slide->getHumanDesc() << "\"," << std::endl;
@@ -1858,6 +1781,7 @@ int SlideConvertor::open(std::string inputFile, std::string outputFile, std::str
       } 
       catch (std::ofstream::failure &e)
       {
+        (void) e;
         std::cerr << "Failed to write json to file '" << jsonName << "'." << std::endl;
         mValidObject = false;
       }
@@ -1873,8 +1797,8 @@ int SlideConvertor::open(std::string inputFile, std::string outputFile, std::str
   myLvl1Divisor = 0;
   if (slide->checkLevel(0) && slide->checkLevel(1))
   {
-    double xLvl1DivisorDbl = (double) slide->getLevelWidth(0) / (double) slide->getLevelWidth(1);
-    double yLvl1DivisorDbl = (double) slide->getLevelHeight(0) / (double) slide->getLevelHeight(1);
+    double xLvl1DivisorDbl = (double) slide->getLevelCols(0) / (double) slide->getLevelCols(1);
+    double yLvl1DivisorDbl = (double) slide->getLevelRows(0) / (double) slide->getLevelRows(1);
     mxLvl1Divisor = (int)(ceil(xLvl1DivisorDbl * 10) / 10);
     myLvl1Divisor = (int)(ceil(yLvl1DivisorDbl * 10) / 10);
     if (mxLvl1Divisor >= 2 && myLvl1Divisor >= 2 && mxLvl1Divisor <= 8 && myLvl1Divisor <= 8)
@@ -1932,8 +1856,8 @@ void SlideConvertor::closeRelated()
   mLastDirection=-1;
   mLastZLevel=-1;
   mValidObject=false;
-  mBaseTotalWidth=0;
-  mBaseTotalHeight=0;
+  mBaseTotalCols=0;
+  mBaseTotalRows=0;
 }
 
 
@@ -1943,7 +1867,7 @@ int main(int argc, char** argv)
   int error=0;
   std::string infile, outfile;
   std::string hostname = "";
-  int hostnameLen = 0;
+  size_t hostnameLen = 0;
 
   int optInOlympusIni = getBoolOpt(SLIDE_DEF_IN_OLYMPUS_INI);
   int optInAperioSvs = getBoolOpt(SLIDE_DEF_IN_APERIO_SVS);
@@ -1952,8 +1876,6 @@ int main(int argc, char** argv)
   int optBlend = getBoolOpt(SLIDE_DEF_BLEND);
   int optHighlight = getBoolOpt(SLIDE_DEF_HIGHLIGHT);
   int optLog = getBoolOpt(SLIDE_DEF_LOG); 
-  int optOpenCVAlign = getBoolOpt(SLIDE_DEF_OPENCV_ALIGN);
-  int optZStack = getBoolOpt(SLIDE_DEF_ZSTACK);
   int optOutJson = getBoolOpt(SLIDE_DEF_OUT_JSON);
   int optQuality = SLIDE_DEF_QUALITY;
   int optDebug = SLIDE_DEF_DEBUG;
@@ -1962,10 +1884,6 @@ int main(int argc, char** argv)
   double optGamma = 1.0f;
   int optRotate = 0;
   int optUseGamma = 0;
-  int optXOffset = 0;
-  int optYOffset = 0;
-  int optUseXOffset = 0;
-  int optUseYOffset = 0;
   int allOptions = 0;
   int optSuppressJson = 0;
   
@@ -1986,6 +1904,7 @@ SLIDE_DEF_OUT_TIF ".\n\n"
 "                             brighter 0.5 is 50% darker. Default no extra\n"
 "                             gamma processing is done.\n"
 "  -b, --blend                Blend the top level with the middle level. \n"
+"                             Only applicable with Olympus ini datasets.\n"
 "                             Default " 
 SLIDE_DEF_BLEND ".\n"
 "  -d, --debug=x              Debug mode, output debugging info and files. The\n"
@@ -2007,10 +1926,6 @@ SLIDE_DEF_LOG ".\n"
 "                             you run out of memory or want to increase\n"
 "                             performance. Default " 
 xstringfy(SLIDE_DEF_MAX_MEM) "mb.\n"
-"  -c, --opencv-align         Use opencv (computer vision) to calculate the \n"
-"                             upper alignment offset for the upper and lower\n"
-"                             levels (almost never required). Default " 
-SLIDE_DEF_OPENCV_ALIGN ".\n"
 "  -q, --quality=x            Set minimal jpeg quality percentage. Default " 
 xstringfy(SLIDE_DEF_QUALITY) "%.\n"
 "  -r, --rotate=x             Set orientation of slide or rotate the entire\n"
@@ -2018,17 +1933,8 @@ xstringfy(SLIDE_DEF_QUALITY) "%.\n"
 "                             270 degree rotation is supported.\n"
 "  -s, --suppress-json        Suppress output of JSON description file.\n"
 "                             By default an output file with a .json\n"
-"                             extention is created with Google Maps Output.\n"
-"  -x, --xoffset=x            Manually set X alignment offset of top pyramid\n"
-"                             level with the bottom. Use this if the default\n"
-"                             calculation or opencv computer vision method\n"
-"                             does not align the top and bottom levels\n"
-"                             properly.\n"
-"  -y, --yoffset=y            Manually set Y alignment offset of top pyramid\n"
-"                             level with the bottom. Use this if the default\n"
-"                             calculation or opencv computer vision method\n"
-"                             does not align the top and bottom levels\n"
-"                             properly.\n\n";
+"                             extention is created with Google Maps Output.\n\n";
+
   if (argc < 3)
   {
     std::cerr << fullSyntax;
@@ -2053,17 +1959,13 @@ xstringfy(SLIDE_DEF_QUALITY) "%.\n"
       {"log",               no_argument,        0,             'l'},
       {"max-mem",           required_argument,  0,             'm'},   
       {"olympus",           no_argument,        0,             'o'},
-      {"opencv-align",      no_argument,        0,             'c'},
       {"quality",           required_argument,  0,             'q'},
       {"rotate",            required_argument,  0,             'r'},
       {"suppress-json",     no_argument,        0,             's'},
-      {"xoffset",           required_argument,  0,             'x'},
-      {"yoffset",           required_argument,  0,             'y'},
-      {"zstack",            no_argument,        0,             'z'},
       {0,                   0,                  0,              0 }
     };
   
-  while((opt = getopt_long(argc, argv, "gta:b:d:h:j:lm:oq:r:sx:y:z", longOptions, &optIndex)) != -1)
+  while((opt = getopt_long(argc, argv, "gta:b:d:h:j:lm:oq:r:s", longOptions, &optIndex)) != -1)
   {
     if (optarg == NULL) optarg = emptyString;
     switch (opt)
@@ -2074,11 +1976,6 @@ xstringfy(SLIDE_DEF_QUALITY) "%.\n"
         break;
       case 'b':
         optBlend = getBoolOpt(optarg, invalidOpt);
-        break;
-      case 'c':
-        #ifdef USE_OPENCV
-        optOpenCVAlign = getBoolOpt(optarg, invalidOpt);
-        #endif
         break;
       case 'd':
         optDebug = getIntOpt(optarg, invalidOpt);
@@ -2121,17 +2018,6 @@ xstringfy(SLIDE_DEF_QUALITY) "%.\n"
         optOutTif = getBoolOpt(optarg, invalidOpt);
         if (optOutTif) optOutGoogle=0;
         break;
-      case 'x':
-        optXOffset = getIntOpt(optarg, invalidOpt);
-        optUseXOffset = 1;
-        break;
-      case 'y':
-        optYOffset = getIntOpt(optarg, invalidOpt);
-        optUseYOffset = 1;
-        break;
-      case 'z':
-        optZStack = getBoolOpt(optarg, invalidOpt);
-        break;
       case '?':
         if (infile.length() == 0)
         {
@@ -2171,13 +2057,10 @@ xstringfy(SLIDE_DEF_QUALITY) "%.\n"
     std::cerr << fullSyntax;
     return 1;
   }
-  allOptions = (optOpenCVAlign * CONV_OPENCV_ALIGN) | 
+  allOptions = 
             (optBlend * CONV_BLEND) |
             (optHighlight * CONV_HIGHLIGHT) |
-            (optZStack * CONV_ZSTACK) |
             (optLog * CONV_LOG) |
-            (optUseXOffset * CONV_CUSTOM_XOFFSET) |
-            (optUseYOffset * CONV_CUSTOM_YOFFSET) |
             (optUseGamma * CONV_CUSTOM_GAMMA) |
             (optOutJson * CONV_OUT_JSON) | 
             (optOutGoogle * CONV_OUT_GOOGLE) |
@@ -2217,6 +2100,10 @@ xstringfy(SLIDE_DEF_QUALITY) "%.\n"
   {
     std::cout << "Slide Orientation: " << optRotate << " degrees" << std::endl;
   }  
+  if (allOptions & CONV_CUSTOM_GAMMA)
+  {
+    std::cout << "Custom gamma set: " << optGamma << std::endl;
+  }
 
   if (optDebug > 0)
   {
@@ -2231,54 +2118,18 @@ xstringfy(SLIDE_DEF_QUALITY) "%.\n"
     std::cout << "Set logging: " << boolInt2Txt(allOptions & CONV_LOG) << std::endl;
     std::cout << "Set debug level: " << optDebug << std::endl;
     std::cout << "Set minimum quality: " << optQuality << std::endl;
-    std::cout << "Use OpenCV/computer vision for XY alignment: " << boolInt2Txt(allOptions & CONV_OPENCV_ALIGN) << std::endl;
     std::cout << "Set border highlight: " << boolInt2Txt(allOptions & CONV_HIGHLIGHT) << std::endl;
     std::cout << "Set blend levels: " << boolInt2Txt(allOptions & CONV_BLEND) << std::endl;
-    std::cout << "Set blend by region: " << boolInt2Txt(allOptions & CONV_REGION) << std::endl;
-    if (optUseGamma)
-    {
-      std::cout << "Set gamma: " << optGamma << std::endl;
-    }
-    else
-    {
-      std::cout << "Set gamma: default" << std::endl;
-    }
-    if (optUseXOffset) 
-    {
-      std::cout << "Set option X offset: " << optXOffset << std::endl;
-    }
-    else
-    {
-      std::cout << "Set option X offset: default" << std::endl;
-    }
-    if (optUseYOffset)
-    {
-      std::cout << "Set option Y offset: " << optYOffset << std::endl;
-    }
-    else
-    {
-      std::cout << "Set option Y offset: default" << std::endl;
-    }
     std::cout << "Set maximum resize/scale memory: " << optMaxMem << "mb " << std::endl;
     std::cout << "Set maximum jpeg cache memory: " << optMaxJpegCache << "mb " << std::endl;
   }
 
   jpgCache.setMaxOpen(optMaxJpegCache);
 
-  #ifdef USE_MAGICK
-  #if defined(__MINGW32__) || defined(__MINGW64__)
-  quickEnv("MAGICK_CODER_MODULE_PATH", getMagickCoreCoderPath(), optDebug);
-  quickEnv("MAGICK_CODER_FILTER_PATH", getMagickCoreFilterPath(), optDebug);
-  #endif
-  quickEnv("MAGICK_MAP_LIMIT", MAGICK_MAP_LIMIT, optDebug);
-  quickEnv("MAGICK_MEMORY_LIMIT", MAGICK_MEMORY_LIMIT, optDebug);
-  quickEnv("MAGICK_DISK_LIMIT", MAGICK_DISK_LIMIT, optDebug);
-  quickEnv("MAGICK_AREA_LIMIT", MAGICK_AREA_LIMIT, optDebug);
-  Magick::MagickWandGenesis();
-  #endif
+  safeBmpEnvSetup(optDebug);
  
   slideConv.setDebugLevel(optDebug);
-  error=slideConv.open(infile.c_str(), outfile.c_str(), hostname, allOptions, optRotate, optXOffset, optYOffset);
+  error=slideConv.open(infile.c_str(), outfile.c_str(), hostname, allOptions, optRotate);
   slideConv.setGamma(allOptions & CONV_CUSTOM_GAMMA, optGamma);
   slideConv.setQuality(optQuality);
   slideConv.setMaxMem(optMaxMem * 1024 * 1024);
@@ -2312,9 +2163,7 @@ xstringfy(SLIDE_DEF_QUALITY) "%.\n"
   }
   slideConv.closeRelated();
   
-  #ifdef USE_MAGICK
-  Magick::MagickWandTerminus();
-  #endif
+  safeBmpEnvCleanup();
   return error;
 }
 
@@ -2326,8 +2175,7 @@ std::string stdStrToUpper(std::string str)
   size_t endStr = str.length();
   for (size_t i = 0; i < endStr; i++)
   {
-    newStr[i] = toupper(str[i]);
+    newStr[i] = (char) toupper(str[i]);
   }
   return newStr;
 }
-

@@ -35,10 +35,10 @@ namespace TIFFLIB {
 typedef struct tiff_dir_attribs
 {
   int dirno; 
-  int64_t width;
+  int64_t cols;
   int64_t length;
   int compression;
-  int tileWidth;
+  int tileCols;
   int tileLength;
   int tileDepth;
   int64_t tileSize;
@@ -75,7 +75,7 @@ protected:
   std::vector<TiffDirAttribs*> mDirBottomUp;
   int mDirCount;
   int mBaseDirno;
-  int mTileWidth, mTileHeight;
+  int mTileCols, mTileRows;
   int mQuality;
   int mLastDir;
   int mLastLevel;
@@ -87,13 +87,13 @@ public:
   void tiffClearAttribs();
   void tiffCleanup();
   void close() { tiffCleanup(); baseCleanup(); tiffClearAttribs(); baseClearAttribs(); }
-  bool read(safeBmp* pDestBmp, int level, int64_t x, int64_t y, int64_t cx, int64_t cy, int64_t *pReadWidth, int64_t *pReadHeight);
+  bool read(safeBmp* pDestBmp, int level, int64_t x, int64_t y, int64_t cx, int64_t cy, int64_t *pReadCols, int64_t *pReadRows);
   bool open(const std::string&, bool setGrayScale = false);
   bool createFile(const std::string& newFilename);
   bool setThumbNail();
   void setDebugMode(bool mode) { mDebugMode = mode; }
-  bool setAttributes(int newSamplesPerPixel, int newBitsPerSample, int64_t newImageWidth, int64_t newImageHeight, int newTileWidth, int newTileHeight, int newTileDepth, int quality);
-  bool setDescription(std::string& strAttributes, int baseWidth, int baseHeight);
+  bool setAttributes(int newSamplesPerPixel, int newBitsPerSample, int64_t newImageCols, int64_t newImageRows, int newTileCols, int newTileRows, int newTileDepth, int quality);
+  bool setDescription(std::string& strAttributes, int baseCols, int baseRows);
   bool setDirectory(int dirno);
   bool setBottomUpDirectory(int dirno);
   int directorySize() { return mDirCount; }
@@ -110,7 +110,7 @@ class AttribSortPyramid
 public:
   bool operator() (const TiffDirAttribs* attrib1, const TiffDirAttribs* attrib2) 
   {
-    return ((double) attrib1->width* (double) attrib1->length) > ((double) attrib2->width*(double) attrib2->length);
+    return ((double) attrib1->cols* (double) attrib1->length) > ((double) attrib2->cols*(double) attrib2->length);
   }
 };
 

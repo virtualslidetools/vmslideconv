@@ -17,29 +17,29 @@ void CompositeSlide::blendLevelsRegionScan(BlendSection** yFreeMap, int64_t ySiz
   }
   JpgIniConf *pBaseConf = mEtc[baseLevel];
   
-  int64_t baseTotalWidth = getLevelWidth(baseLevel);
-  int64_t totalWidth = pBaseConf->mTotalWidth;
-  int64_t totalHeight = pBaseConf->mTotalHeight;
-  int64_t pixelWidth = pBaseConf->mPixelWidth;
-  int64_t pixelHeight = pBaseConf->mPixelHeight;
-  int64_t stdFileWidth = pBaseConf->mPixelWidth;
-  int64_t stdFileHeight = pBaseConf->mPixelHeight;
+  int64_t baseTotalCols = getLevelCols(baseLevel);
+  int64_t totalCols = pBaseConf->mTotalCols;
+  int64_t totalRows = pBaseConf->mTotalRows;
+  int64_t pixelCols = pBaseConf->mPixelCols;
+  int64_t pixelRows = pBaseConf->mPixelRows;
+  int64_t stdFileCols = pBaseConf->mPixelCols;
+  int64_t stdFileRows = pBaseConf->mPixelRows;
   if (orientation == 90 || orientation == 270 || orientation == -90) 
   {
-    stdFileHeight = pixelWidth;
-    stdFileWidth = pixelHeight;
+    stdFileRows = pixelCols;
+    stdFileCols = pixelRows;
   }
   for (int64_t y=0; y < ySize; y++)
   {
     BlendSection *xTail = new BlendSection(0);
-    xTail->setFree(baseTotalWidth);
+    xTail->setFree(baseTotalCols);
     yFreeMap[y] = xTail;
   }
  
-  int64_t fileWidth=stdFileWidth;
+  int64_t fileCols=stdFileCols;
   for (int64_t tileNum=0; tileNum<pBaseConf->mTotalTiles; tileNum++)
   {
-    int64_t fileHeight = stdFileHeight;
+    int64_t fileRows = stdFileRows;
     int64_t xPixel = pBaseConf->mxyArr[tileNum].mxPixel;
     int64_t yPixel = pBaseConf->mxyArr[tileNum].myPixel;
     int64_t x2 = pBaseConf->mxyArr[tileNum].mxPixel;
@@ -50,26 +50,26 @@ void CompositeSlide::blendLevelsRegionScan(BlendSection** yFreeMap, int64_t ySiz
     }  
     else if (orientation == 90)
     {
-      x2 = (totalHeight - yPixel) - pixelHeight;
+      x2 = (totalRows - yPixel) - pixelRows;
       y2 = xPixel;
     }
     else if (orientation == -90 || orientation == 270)
     {
       x2 = yPixel;
-      y2 = (totalWidth - xPixel) - pixelWidth;
+      y2 = (totalCols - xPixel) - pixelCols;
     }
     else if (orientation == 180)
     {
-      x2 = (totalWidth - xPixel) - pixelWidth;
-      y2 = (totalHeight - yPixel) - pixelHeight;
+      x2 = (totalCols - xPixel) - pixelCols;
+      y2 = (totalRows - yPixel) - pixelRows;
     }
-    int64_t x3 = x2 + fileWidth;
-    int64_t y3 = y2 + fileHeight;
+    int64_t x3 = x2 + fileCols;
+    int64_t y3 = y2 + fileRows;
     int64_t y = y2;
     if (y < 0)
     {
-      fileHeight += y;
-      if (fileHeight <= 0) continue;
+      fileRows += y;
+      if (fileRows <= 0) continue;
       y = 0;
     }
     else if (y >= ySize)
@@ -88,7 +88,7 @@ void CompositeSlide::blendLevelsRegionScan(BlendSection** yFreeMap, int64_t ySiz
       if (xTail == NULL)
       {
         xTail = new BlendSection(0);
-        xTail->setFree(baseTotalWidth);
+        xTail->setFree(baseTotalCols);
         yFreeMap[y] = xTail;
       }
       while (xTail)
@@ -184,18 +184,18 @@ void blendLevels(BlendArgs *args)
 {
   double xSrc = args->xSrc;
   double ySrc = args->ySrc;
-  double grabWidthB = args->grabWidthB;
-  double grabHeightB = args->grabHeightB;
+  double grabColsB = args->grabColsB;
+  double grabRowsB = args->grabRowsB;
   
-  if (grabWidthB < 0.0 || grabHeightB < 0.0) return;
+  if (grabColsB < 0.0 || grabRowsB < 0.0) return;
 
   double xFactor = args->xFactor;
   double yFactor = args->yFactor;
  
   int64_t xStartA = (int64_t) floor(xSrc);
   int64_t yStartA = (int64_t) floor(ySrc);
-  int64_t xEndA = (int64_t) ceil(xSrc + grabWidthB);
-  int64_t yEndA = (int64_t) ceil(ySrc + grabHeightB);
+  int64_t xEndA = (int64_t) ceil(xSrc + grabColsB);
+  int64_t yEndA = (int64_t) ceil(ySrc + grabRowsB);
   if (yEndA > args->ySize) yEndA = args->ySize;
   
   int64_t xStartC = (int64_t) floor(xSrc / xFactor);

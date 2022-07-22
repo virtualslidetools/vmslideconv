@@ -1,0 +1,14 @@
+{
+  "name": "vmslideconv",
+  "version-string": "1.2",
+  "port-version": 1,
+  "homepage": "https://medtech.med.wayne.edu/vmslideconv/",
+  "description": "Virtual Microscopy Slide Convertor.",
+  "dependencies": [
+    "tiff",
+    "opencv4",
+    "openjpeg",
+    "minizip",
+    "libjpeg-turbo"
+  ]
+}

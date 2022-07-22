@@ -9,5 +9,4 @@ void retractCursor();
 bool platform_mkdir(std::string name, std::string* perror);
 
 #define SEPARATOR '\\'
-
-#define
+#endif

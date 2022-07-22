@@ -25,13 +25,15 @@ void retractCursor()
 
 bool platform_mkdir(std::string name, std::string* perror)
 {
+  char mkdirErr[512];
   if (_mkdir(name.c_str())==0)
   {
     return true;
   }
   if (perror)
   {
-    *perror = std::strerror(errno);
+    strerror_s(mkdirErr, 512, errno);
+    *perror = mkdirErr;
   }  
   return false;
 }

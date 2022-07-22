@@ -34,7 +34,7 @@ typedef struct
   safeBmp* pSafeDest;
   safeBmp* pSafeSrcL2;
   double xSrc, ySrc;
-  double grabWidthB, grabHeightB;
+  double grabColsB, grabRowsB;
   double xFactor, yFactor;
   int64_t xMargin, yMargin;
   BlendSection **yFreeMap;

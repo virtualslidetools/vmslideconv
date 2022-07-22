@@ -5,150 +5,164 @@
 #include <iostream>
 #include "safebmp.h"
 
-safeBmp * safeBmpAlloc(int64_t width, int64_t height)
+#ifdef USE_OPENCV
+#include <opencv2/opencv.hpp>
+#endif
+
+#ifdef USE_MAGICK
+namespace Magick
+{
+#include <MagickCore/MagickCore.h>
+#include <MagickWand/MagickWand.h>
+}
+const char* getMagickCoreCoderPath();
+const char* getMagickCoreFilterPath();
+const char* getMagickCoreLibraryPath();
+#endif 
+
+safeBmp * safeBmpAlloc(int64_t cols, int64_t rows)
 {
   safeBmp *bmp=NULL;
   
-  int64_t strideWidth = width * 3;
+  int64_t strideCols = cols * 3;
   try 
   {
     bmp = new safeBmp;
     bmp->data = NULL;
-    if (strideWidth > 0 && height > 0)
+    if (strideCols > 0 && rows > 0)
     {
-      bmp->data = new BYTE[strideWidth * height];
-      bmp->height = height;
-      bmp->width = width;
-      bmp->strideWidth = strideWidth;
+      bmp->data = new BYTE[strideCols * rows];
+      bmp->rows = rows;
+      bmp->cols = cols;
+      bmp->strideCols = strideCols;
     }
   }
   catch (std::bad_alloc &xa)
   {
-    std::cerr << "Failed to allocate image of memory size=" << ((strideWidth * height) / 1024) << " kb." << std::endl;
+    (void) xa;
+    std::cerr << "Failed to allocate image of memory size=" << ((strideCols * rows) / 1024) << " kb." << std::endl;
     exit(1);
   }
-  if (bmp->data)
+  if (bmp && bmp->data)
   {
+    bmp->freeStruct = true;
     bmp->freeData = true;
-    bmp->freePtr = true;
   }
   else
   {
-    bmp->height = 0;
-    bmp->width = 0;
-    bmp->strideWidth = 0;
-    bmp->freeData = false;
-    bmp->freePtr = true;
+    std::cerr << "Failed to allocate image of memory size=" << ((strideCols * rows) / 1024) << " kb." << std::endl;
+    exit(1);
   }
   return bmp;
 }
 
 
-BYTE* safeBmpAlloc2(safeBmp *bmp, int64_t width, int64_t height)
+BYTE* safeBmpAlloc2(safeBmp *bmp, int64_t cols, int64_t rows)
 {
   bmp->data = NULL;
-  int64_t strideWidth = width * 3;
+
+  int64_t strideCols = cols * 3;
   try
   {
-    if (strideWidth > 0 && height > 0)
+    if (strideCols > 0 && rows > 0)
     {
-      bmp->data = new BYTE[strideWidth * height];
+      bmp->data = new BYTE[strideCols * rows];
     }
   }
   catch (std::bad_alloc &xa)
   {
+    (void) xa;
     bmp->data = NULL;
-    std::cerr << "Failed to allocate image of memory size=" << ((strideWidth * height) / 1024) << " kb." << std::endl;
+    std::cerr << "Failed to allocate image of memory size=" << ((strideCols * rows) / 1024) << " kb." << std::endl;
     exit(1);
   }
   if (bmp->data)
   {
+    bmp->freeStruct = false;
     bmp->freeData = true;
-    bmp->freePtr = false;
-    bmp->strideWidth = strideWidth;
-    bmp->height = height;
-    bmp->width = width;
+    bmp->strideCols = strideCols;
+    bmp->rows = rows;
+    bmp->cols = cols;
   }
   else
   {
-    bmp->freeData = false;
-    bmp->freePtr = false;
-    bmp->strideWidth = 0;
-    bmp->height = 0;
-    bmp->width = 0;
+    std::cerr << "Failed to allocate image of memory size=" << ((strideCols * rows) / 1024) << " kb." << std::endl;
+    exit(1);
   }
   return bmp->data;
 }
 
 
-BYTE* safeBmpReAlloc2(safeBmp *bmp, int64_t width, int64_t height)
+BYTE* safeBmpReAlloc2(safeBmp *bmp, int64_t cols, int64_t rows)
 {
-  int64_t strideWidth = width * 3;
-  if (bmp->width != width || bmp->height != height)
+  int64_t strideCols = cols * 3;
+  
+  if (bmp->cols != cols || bmp->rows != rows)
   {
     try
     {
-      if (bmp->data)
+      if (bmp->freeData && bmp->data)
       {
         delete[] bmp->data;
-        bmp->data = 0;
+        bmp->data = NULL;
+        bmp->freeData = false;
+        bmp->strideCols = 0;
+        bmp->cols = 0;
+        bmp->rows = 0;
       }
-      if (strideWidth > 0 && height > 0)
+      if (strideCols > 0 && rows > 0)
       {
-        bmp->data = new BYTE[strideWidth * height];
+        bmp->data = new BYTE[strideCols * rows];
       }
     }
     catch (std::bad_alloc &xa)
     {
+      (void) xa;
       bmp->data = NULL;
-      std::cerr << "Failed to allocate image of memory size=" << ((strideWidth * height) / 1024) << " kb." << std::endl;
+      std::cerr << "Failed to allocate image of memory size=" << ((strideCols * rows) / 1024) << " kb." << std::endl;
       exit(1);
     }
     if (bmp->data)
     {
       bmp->freeData = true;
-      bmp->freePtr = false;
-      bmp->strideWidth = strideWidth;
-      bmp->height = height;
-      bmp->width = width;
+      bmp->strideCols = strideCols;
+      bmp->rows = rows;
+      bmp->cols = cols;
     }
-  }
-  if (bmp->data == 0)
-  {
-    bmp->freeData = false;
-    bmp->freePtr = false;
-    bmp->strideWidth = 0;
-    bmp->height = 0;
-    bmp->width = 0;
+    else
+    {
+      std::cerr << "Failed to allocate image of memory size=" << ((strideCols * rows) / 1024) << " kb." << std::endl;
+      exit(1);
+    }
   }
   return bmp->data;
 }
 
 
-safeBmp* safeBmpSrc(BYTE *data, int64_t width, int64_t height)
+safeBmp* safeBmpSrc(BYTE *data, int64_t cols, int64_t rows)
 {
   safeBmp* bmp=new safeBmp;
   if (!bmp) return NULL;
 
-  bmp->width = width;
-  bmp->strideWidth = width * 3;
-  bmp->height = height;
+  bmp->cols = cols;
+  bmp->strideCols = cols * 3;
+  bmp->rows = rows;
   bmp->data = data;
+  bmp->freeStruct = true;
   bmp->freeData = false;
-  bmp->freePtr = true;
 
   return bmp;
 }
 
 
-void safeBmpInit(safeBmp *bmp, BYTE *bmpPtr, int64_t width, int64_t height)
+void safeBmpInit(safeBmp *bmp, BYTE *bmpPtr, int64_t cols, int64_t rows)
 {
-  bmp->width = width;
-  bmp->strideWidth = width * 3;
-  bmp->height = height;
+  bmp->cols = cols;
+  bmp->strideCols = cols * 3;
+  bmp->rows = rows;
   bmp->data = bmpPtr;
+  bmp->freeStruct = false;
   bmp->freeData = false;
-  bmp->freePtr = false;
 }
 
 
@@ -159,9 +173,14 @@ void safeBmpFree(safeBmp *bmp)
   {
     delete[] bmp->data;
     bmp->data = NULL;
+    bmp->cols = 0;
+    bmp->rows = 0;
+    bmp->strideCols = 0;
+    bmp->freeData = false;
   }
-  if (bmp->freePtr)
+  if (bmp->freeStruct)
   {
+    bmp->freeStruct = false;
     delete bmp;
   }
 }
@@ -169,7 +188,7 @@ void safeBmpFree(safeBmp *bmp)
 
 void safeBmpUint32Set(safeBmp *bmp, uint32_t value)
 {
-  uint64_t size=bmp->width * bmp->height;
+  uint64_t size=bmp->cols * bmp->rows;
   uint32_t *data = (uint32_t*) bmp->data;
   for (uint64_t i=0; i < size; i++) data[i] = value;
 }
@@ -183,14 +202,14 @@ void safeBmpCpy(safeBmp *bmpDest, int64_t xDest, int64_t yDest, safeBmp *bmpSrc,
     cols += xSrc;
     xSrc = 0;
   }
-  if (xEnd < 0 || xSrc > bmpSrc->width || cols <= 0 ||
-      xDest > bmpDest->width) 
+  if (xEnd < 0 || xSrc > bmpSrc->cols || cols <= 0 ||
+      xDest > bmpDest->cols) 
   {
     return;
   }
-  if (xEnd > bmpSrc->width)
+  if (xEnd > bmpSrc->cols)
   {
-    cols = bmpSrc->width - xSrc;
+    cols = bmpSrc->cols - xSrc;
     if (cols < 0) return;
   }
   int64_t yEnd = ySrc + rows;
@@ -199,36 +218,36 @@ void safeBmpCpy(safeBmp *bmpDest, int64_t xDest, int64_t yDest, safeBmp *bmpSrc,
     rows += ySrc;
     ySrc = 0;
   }
-  if (yEnd < 0 || ySrc > bmpSrc->height || rows <= 0 ||
-      yDest > bmpDest->height) 
+  if (yEnd < 0 || ySrc > bmpSrc->rows || rows <= 0 ||
+      yDest > bmpDest->rows) 
   {
     return;
   }
-  if (yEnd > bmpSrc->height)
+  if (yEnd > bmpSrc->rows)
   {
-    rows = bmpSrc->height - ySrc;
+    rows = bmpSrc->rows - ySrc;
   }
   if (xDest < 0)
   {
     cols += xDest;
     xDest = 0;
   }
-  if (xDest + cols > bmpDest->width)
+  if (xDest + cols > bmpDest->cols)
   {
-    cols = bmpDest->width - xDest;
+    cols = bmpDest->cols - xDest;
   }
   if (yDest < 0)
   {
     rows += yDest;
     yDest = 0;
   }
-  if (yDest + rows > bmpDest->height)
+  if (yDest + rows > bmpDest->rows)
   {
-    rows = bmpDest->height - yDest;
+    rows = bmpDest->rows - yDest;
   }
   if (rows < 0 || cols <= 0) return;
-  int64_t srcRowWidth = bmpSrc->strideWidth;
-  int64_t destRowWidth = bmpDest->strideWidth;
+  int64_t srcRowCols = bmpSrc->strideCols;
+  int64_t destRowCols = bmpDest->strideCols;
   int64_t xSrcOffset = xSrc * 3;
   int64_t xDestOffset = xDest * 3;
   int64_t colCopySize=cols*3;
@@ -236,8 +255,8 @@ void safeBmpCpy(safeBmp *bmpDest, int64_t xDest, int64_t yDest, safeBmp *bmpSrc,
   BYTE *srcData = (BYTE*) bmpSrc->data;
   for (int64_t y = 0; y < rows; y++)
   {
-    int64_t src = ((y+ySrc) * srcRowWidth) + xSrcOffset;
-    int64_t dest = ((y+yDest) * destRowWidth) + xDestOffset;
+    int64_t src = ((y+ySrc) * srcRowCols) + xSrcOffset;
+    int64_t dest = ((y+yDest) * destRowCols) + xDestOffset;
     memcpy(&destData[dest], &srcData[src], colCopySize);
   }
 }
@@ -249,8 +268,8 @@ void safeBmpBGRtoRGBCpy(safeBmp *bmpDest, safeBmp *bmpSrc)
   int64_t ySrc = 0;
   int64_t xDest = 0;
   int64_t yDest = 0;
-  int64_t cols = bmpSrc->width;
-  int64_t rows = bmpSrc->height;
+  int64_t cols = bmpSrc->cols;
+  int64_t rows = bmpSrc->rows;
 
   int64_t xEnd = xSrc + cols;
   if (xSrc < 0)
@@ -258,14 +277,14 @@ void safeBmpBGRtoRGBCpy(safeBmp *bmpDest, safeBmp *bmpSrc)
     cols += xSrc;
     xSrc = 0;
   }
-  if (xEnd < 0 || xSrc > bmpSrc->width || cols <= 0 ||
-      xDest > bmpDest->width) 
+  if (xEnd < 0 || xSrc > bmpSrc->cols || cols <= 0 ||
+      xDest > bmpDest->cols) 
   {
     return;
   }
-  if (xEnd > bmpSrc->width)
+  if (xEnd > bmpSrc->cols)
   {
-    cols = bmpSrc->width - xSrc;
+    cols = bmpSrc->cols - xSrc;
     if (cols < 0) return;
   }
   int64_t yEnd = ySrc + rows;
@@ -274,36 +293,36 @@ void safeBmpBGRtoRGBCpy(safeBmp *bmpDest, safeBmp *bmpSrc)
     rows += ySrc;
     ySrc = 0;
   }
-  if (yEnd < 0 || ySrc > bmpSrc->height || rows <= 0 ||
-      yDest > bmpDest->height) 
+  if (yEnd < 0 || ySrc > bmpSrc->rows || rows <= 0 ||
+      yDest > bmpDest->rows) 
   {
     return;
   }
-  if (yEnd > bmpSrc->height)
+  if (yEnd > bmpSrc->rows)
   {
-    rows = bmpSrc->height - ySrc;
+    rows = bmpSrc->rows - ySrc;
   }
   if (xDest < 0)
   {
     cols += xDest;
     xDest = 0;
   }
-  if (xDest + cols > bmpDest->width)
+  if (xDest + cols > bmpDest->cols)
   {
-    cols = bmpDest->width - xDest;
+    cols = bmpDest->cols - xDest;
   }
   if (yDest < 0)
   {
     rows += yDest;
     yDest = 0;
   }
-  if (yDest + rows > bmpDest->height)
+  if (yDest + rows > bmpDest->rows)
   {
-    rows = bmpDest->height - yDest;
+    rows = bmpDest->rows - yDest;
   }
   if (rows < 0 || cols <= 0) return;
-  int64_t srcRowWidth = bmpSrc->strideWidth;
-  int64_t destRowWidth = bmpDest->strideWidth;
+  int64_t srcRowCols = bmpSrc->strideCols;
+  int64_t destRowCols = bmpDest->strideCols;
   int64_t xSrcOffset = xSrc * 3;
   int64_t xDestOffset = xDest * 3;
   int64_t colCopySize=cols*3;
@@ -311,8 +330,8 @@ void safeBmpBGRtoRGBCpy(safeBmp *bmpDest, safeBmp *bmpSrc)
   BYTE *srcData = (BYTE*) bmpSrc->data;
   for (int64_t y = 0; y < rows; y++)
   {
-    int64_t src = ((y+ySrc) * srcRowWidth) + xSrcOffset;
-    int64_t dest = ((y+yDest) * destRowWidth) + xDestOffset;
+    int64_t src = ((y+ySrc) * srcRowCols) + xSrcOffset;
+    int64_t dest = ((y+yDest) * destRowCols) + xDestOffset;
     //memcpy(&destData[dest], &srcData[src], colCopySize);
     int64_t end = src + colCopySize;
     while (src < end)
@@ -330,23 +349,23 @@ void safeBmpBGRtoRGBCpy(safeBmp *bmpDest, safeBmp *bmpSrc)
 
 void safeBmpRotate(safeBmp *bmpDest, safeBmp *bmpSrc, int orientation)
 {
-  int64_t srcWidth = bmpSrc->width;
-  int64_t srcHeight = bmpSrc->height;
-  int64_t srcLineWidth = srcWidth * 3;
+  int64_t srcCols = bmpSrc->cols;
+  int64_t srcRows = bmpSrc->rows;
+  int64_t srcLineCols = srcCols * 3;
   BYTE *in = bmpSrc->data;
   BYTE *out = bmpDest->data;
 
   if (orientation == 90)
   {
-    if (srcWidth > bmpDest->height || srcHeight > bmpDest->width) return;
-    int64_t destLineWidth = bmpDest->width * 3;
-    for (int64_t xSrc=0; xSrc < srcWidth; xSrc++)
+    if (srcCols > bmpDest->rows || srcRows > bmpDest->cols) return;
+    int64_t destLineCols = bmpDest->cols * 3;
+    for (int64_t xSrc=0; xSrc < srcCols; xSrc++)
     {
       int64_t xOffset = xSrc * 3;
-      BYTE *outLine = out + (xSrc * destLineWidth);
-      for (int64_t ySrc=0; ySrc < srcHeight; ySrc++)
+      BYTE *outLine = out + (xSrc * destLineCols);
+      for (int64_t ySrc=0; ySrc < srcRows; ySrc++)
       {
-        BYTE* inLine = in + ((srcHeight - ySrc - 1) * srcLineWidth);
+        BYTE* inLine = in + ((srcRows - ySrc - 1) * srcLineCols);
         inLine += xOffset;
         *outLine++ = *inLine++;
         *outLine++ = *inLine++;
@@ -356,14 +375,14 @@ void safeBmpRotate(safeBmp *bmpDest, safeBmp *bmpSrc, int orientation)
   }
   else if (orientation == 180)
   {
-    if (srcWidth > bmpDest->width || srcHeight > bmpDest->height) return;
+    if (srcCols > bmpDest->cols || srcRows > bmpDest->rows) return;
     BYTE *inLine = in;
-    int64_t destLineWidth = bmpDest->width * 3;
-    int64_t xDestAlign = (destLineWidth - srcLineWidth) + 3;
-    for (int64_t ySrc=0; ySrc < srcHeight; ySrc++)
+    int64_t destLineCols = bmpDest->cols * 3;
+    int64_t xDestAlign = (destLineCols - srcLineCols) + 3;
+    for (int64_t ySrc=0; ySrc < srcRows; ySrc++)
     {
-      BYTE *outLine = out + (((srcHeight - ySrc)) * destLineWidth) - xDestAlign;
-      for (int64_t xSrc=0; xSrc < srcWidth; xSrc++)
+      BYTE *outLine = out + (((srcRows - ySrc)) * destLineCols) - xDestAlign;
+      for (int64_t xSrc=0; xSrc < srcCols; xSrc++)
       {
         *outLine++ = *inLine++;
         *outLine++ = *inLine++;
@@ -374,20 +393,177 @@ void safeBmpRotate(safeBmp *bmpDest, safeBmp *bmpSrc, int orientation)
   }
   else if (orientation == 270 || orientation == -90)
   {
-    if (srcWidth > bmpDest->height || srcHeight > bmpDest->width) return;
-    int64_t destLineWidth = srcHeight * 3;
-    int64_t srcLineWidth = srcWidth * 3;
-    for (int64_t xSrc=0; xSrc < srcWidth; xSrc++)
+    if (srcCols > bmpDest->rows || srcRows > bmpDest->cols) return;
+    int64_t destLineCols = srcRows * 3;
+    for (int64_t xSrc=0; xSrc < srcCols; xSrc++)
     {
-      BYTE* outLine = out + (srcWidth - xSrc - 1) * destLineWidth;
+      BYTE* outLine = out + (srcCols - xSrc - 1) * destLineCols;
       int64_t xSrcOffset = xSrc * 3;
-      for (int64_t ySrc=0; ySrc < srcHeight; ySrc++)
+      for (int64_t ySrc=0; ySrc < srcRows; ySrc++)
       {
-        BYTE* inLine = in + (ySrc * srcLineWidth) + xSrcOffset;
+        BYTE* inLine = in + (ySrc * srcLineCols) + xSrcOffset;
         *outLine++ = *inLine++;
         *outLine++ = *inLine++;
         *outLine++ = *inLine++;
       }
     }
   }
+}
+
+
+safeBmp* safeBmpZoom(safeBmp* pBmpSrc, int64_t newCols, int64_t newRows, double xScaleResize, double yScaleResize, int scaleMethod, safeBmpZoomRes* pZoomRes)
+{
+  #ifdef USE_OPENCV
+  (void) pZoomRes;
+  cv::Mat* pImgScaled = new cv::Mat;
+  // cv::Mat takes the number of rows first, than columns
+  cv::Mat imgSrc((int) pBmpSrc->rows, (int) pBmpSrc->cols, CV_8UC3, pBmpSrc->data);
+  cv::Size scaledSize((int) newCols, (int)newRows);
+  cv::resize(imgSrc, *pImgScaled, scaledSize, xScaleResize, yScaleResize, scaleMethod == SAFEBMP_BEST_ENLARGE ? cv::INTER_CUBIC : cv::INTER_AREA);
+  imgSrc.release();
+  safeBmp *pBmpDest = safeBmpAlloc(pImgScaled->cols, pImgScaled->rows);
+  memcpy(pBmpDest->data, pImgScaled->data, pImgScaled->cols * pImgScaled->rows * 3);
+  pImgScaled->release();
+  delete pImgScaled;
+
+  #else
+
+  Magick::MagickSetCompression(pZoomRes->magickWand, Magick::NoCompression);
+  Magick::MagickSetImageType(pZoomRes->magickWand, Magick::TrueColorType);
+  Magick::MagickSetImageDepth(pZoomRes->magickWand, 8);
+  Magick::MagickSetImageAlphaChannel(pZoomRes->magickWand, Magick::OffAlphaChannel);
+  Magick::MagickNewImage(pZoomRes->magickWand, pBmpSrc->cols, pBmpSrc->rows, pZoomRes->pixelWand);
+  Magick::MagickImportImagePixels(pZoomRes->magickWand, 0, 0, pBmpSrc->cols, pBmpSrc->rows, "RGB", Magick::CharPixel, pBmpSrc->data);
+  //Magick::MagickConstituteImage(l.magickWand, l.grabColsL2, l.grabRowsL2, "RGB", Magick::CharPixel, bitmapL2Mini.data);
+  Magick::MagickResizeImage(pZoomRes->magickWand, newCols, newRows, scaleMethod == SAFEBMP_BEST_ENLARGE ? Magick::MitchellFilter : Magick::LanczosFilter);
+  safeBmp *pBmpDest = safeBmpAlloc(newCols, newRows);
+  Magick::MagickExportImagePixels(pZoomRes->magickWand, 0, 0, newCols, newRows, "RGB", Magick::CharPixel, pBmpDest->data);
+  Magick::ClearMagickWand(pZoomRes->magickWand);
+  #endif
+  return pBmpDest;
+}
+
+
+void safeBmpZoom2(safeBmp* pBmpDest, safeBmp* pBmpSrc, int64_t newCols, int64_t newRows, double xScaleResize, double yScaleResize, int scaleMethod, safeBmpZoomRes* pZoomRes)
+{
+  #ifdef USE_OPENCV
+  (void) pZoomRes;
+  cv::Mat* pImgScaled = new cv::Mat;
+  // cv::Mat takes the number of rows first, than columns
+  cv::Mat imgSrc((int) pBmpSrc->rows, (int) pBmpSrc->cols, CV_8UC3, pBmpSrc->data);
+  cv::Size scaledSize((int) newCols, (int)newRows);
+  cv::resize(imgSrc, *pImgScaled, scaledSize, xScaleResize, yScaleResize, scaleMethod == SAFEBMP_BEST_ENLARGE ? cv::INTER_CUBIC : cv::INTER_AREA);
+  imgSrc.release();
+  safeBmpAlloc2(pBmpDest, pImgScaled->cols, pImgScaled->rows);
+  memcpy(pBmpDest->data, pImgScaled->data, pImgScaled->cols * pImgScaled->rows * 3);
+  pImgScaled->release();
+  delete pImgScaled;
+
+  #else
+  
+  Magick::MagickSetCompression(pZoomRes->magickWand, Magick::NoCompression);
+  Magick::MagickSetImageType(pZoomRes->magickWand, Magick::TrueColorType);
+  Magick::MagickSetImageDepth(pZoomRes->magickWand, 8);
+  Magick::MagickSetImageAlphaChannel(pZoomRes->magickWand, Magick::OffAlphaChannel);
+  Magick::MagickNewImage(pZoomRes->magickWand, pBmpSrc->cols, pBmpSrc->rows, pZoomRes->pixelWand);
+  Magick::MagickImportImagePixels(pZoomRes->magickWand, 0, 0, pBmpSrc->cols, pBmpSrc->rows, "RGB", Magick::CharPixel, pBmpSrc->data);
+  //Magick::MagickConstituteImage(l.magickWand, l.grabColsL2, l.grabRowsL2, "RGB", Magick::CharPixel, bitmapL2Mini.data);
+  Magick::MagickResizeImage(pZoomRes->magickWand, newCols, newRows, scaleMethod == SAFEBMP_BEST_ENLARGE ? Magick::MitchellFilter : Magick::LanczosFilter);
+  safeBmpAlloc2(pBmpDest, newCols, newRows);
+  Magick::MagickExportImagePixels(pZoomRes->magickWand, 0, 0, newCols, newRows, "RGB", Magick::CharPixel, pBmpDest->data);
+  Magick::ClearMagickWand(pZoomRes->magickWand);
+  #endif
+}
+
+
+void quickEnv(const char* var, const char* value, int optDebug)
+{
+  char fullChar[512];
+  std::string full=var;
+  full.append("=");
+  full.append(value);
+  const char * fullConst = full.c_str();
+  fullChar[0] = 0;
+
+  #ifdef HAVE_STRNCPY_S
+  strncpy_s(fullChar, sizeof(fullChar)-1, fullConst, full.size());
+  #else
+  strncpy(fullChar, fullConst, sizeof(fullChar)-1);
+  #endif
+
+  if (optDebug > 0)
+  {
+    std::cout << "ENV: " << fullChar << std::endl;
+  }
+  #ifdef HAVE__PUTENV
+  _putenv(fullChar);
+  #else
+  putenv(fullChar);
+  #endif
+}
+
+
+void safeBmpEnvSetup(int optDebug)
+{
+  (void) optDebug;
+  #ifdef USE_MAGICK
+  #if defined(__MINGW32__) || defined(__MINGW64__)
+  quickEnv("MAGICK_CODER_MODULE_PATH", getMagickCoreCoderPath(), optDebug);
+  quickEnv("MAGICK_CODER_FILTER_PATH", getMagickCoreFilterPath(), optDebug);
+  #endif
+  quickEnv("MAGICK_MAP_LIMIT", MAGICK_MAP_LIMIT, optDebug);
+  quickEnv("MAGICK_MEMORY_LIMIT", MAGICK_MEMORY_LIMIT, optDebug);
+  quickEnv("MAGICK_DISK_LIMIT", MAGICK_DISK_LIMIT, optDebug);
+  quickEnv("MAGICK_AREA_LIMIT", MAGICK_AREA_LIMIT, optDebug);
+  Magick::MagickWandGenesis();
+  #endif
+}
+
+
+void safeBmpEnvCleanup()
+{
+  #ifdef USE_MAGICK
+  Magick::MagickWandTerminus();
+  #endif
+}
+
+
+safeBmpZoomRes* safeBmpZoomResInit()
+{
+  safeBmpZoomRes *pZoomRes = NULL;
+
+  #ifdef USE_MAGICK
+  pZoomRes = new safeBmpZoomRes;
+  pZoomRes->magickWand = Magick::NewMagickWand();
+  Magick::MagickSetCompression(pZoomRes->magickWand, Magick::NoCompression);
+  Magick::MagickSetImageType(pZoomRes->magickWand, Magick::TrueColorType);
+  Magick::MagickSetImageDepth(pZoomRes->magickWand, 8);
+  Magick::MagickSetImageAlphaChannel(pZoomRes->magickWand, Magick::OffAlphaChannel);
+  pZoomRes->pixelWand = Magick::NewPixelWand();
+  Magick::PixelSetColor(pZoomRes->pixelWand, "#ffffff");
+  #endif
+
+  return pZoomRes;
+}
+
+
+void safeBmpZoomResFree(safeBmpZoomRes *pZoomRes)
+{
+  (void) pZoomRes;
+  #ifdef USE_MAGICK
+  if (pZoomRes)
+  {
+    if (pZoomRes->magickWand) 
+    {
+      Magick::DestroyMagickWand(pZoomRes->magickWand);
+      pZoomRes->magickWand = NULL;
+    }
+    if (pZoomRes->pixelWand)
+    {
+      Magick::DestroyPixelWand(pZoomRes->pixelWand);
+      pZoomRes->pixelWand = NULL;
+    }
+    delete pZoomRes;
+  }
+  #endif
 }

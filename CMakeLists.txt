@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 3.0)
 
-#if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
-#  set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
-#endif()
-project( vmslideconv LANGUAGES C CXX )
+project(vmslideconv LANGUAGES C CXX )
+
+if (NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE "Release")
+endif()
 
 if (CMAKE_TOOLCHAIN_FILE)
   include(${CMAKE_TOOLCHAIN_FILE})
@@ -13,7 +14,8 @@ include(CheckStructHasMember)
 
 if ("\"${CMAKE_CXX_COMPILER_ID}\"" MATCHES "MSVC")
   find_package(ZLIB REQUIRED)
-  message("Zlib include directory=${ZLIB_INCLUDE_DIR}")
+  set(ZLIB::ZLIB)
+ # message("Zlib include directory=${ZLIB_INCLUDE_DIR}")
   find_package(minizip 1 REQUIRED)
   find_path(MINIZIP_INCLUDE_DIRS NAMES zip.h PATH_SUFFIXES minizip include)
   message("Minizip include directory=${MINIZIP_INCLUDE_DIRS}")
@@ -21,14 +23,7 @@ if ("\"${CMAKE_CXX_COMPILER_ID}\"" MATCHES "MSVC")
   set(CMAKE_REQUIRED_INCLUDES "${MINIZIP_INCLUDE_DIRS};${ZLIB_INCLUDE_DIR}")
 else()
   find_package(ZLIB)
-endif()
-
-if (MSVC)
-  target_compile_options(${TARGET_NAME} PRIVATE /W4 /WX)  
-elseif (${CMAKE_CXX_COMPILER_ID} MATCHES "GNU")
   find_package(PkgConfig)
-  set(CMAKE_CXX_FLAGS_DEBUG "-g -pg -O0 -Wall -Wextra -Wpedantic")
-  set(CMAKE_CXX_FLAGS_RELEASE "-g -O3 -Wall -Wextra -Wpedantic")
 endif()
 
 if (NOT MINIZIP_INCLUDE_DIRS AND PKG_CONFIG_FOUND)
@@ -100,6 +95,8 @@ find_package(Threads)
 if (USE_MAGICK)
 	find_package(ImageMagick COMPONENTS MagickCore MagickWand)
 	set (USE_OPENCV OFF)
+else()
+	set (USE_OPENCV ON)
 endif()
 
 if (USE_OPENCV)
@@ -137,7 +134,7 @@ if (${USE_MAGICK} STREQUAL "OFF")
   add_definitions(-DUSE_OPENCV=1)
   if (OpenCV_FOUND)
  	  set (OPENCV_LIBRARIES ${OpenCV_LIBS})
-    set (OPENCV_INCLUDE_DIRS ${OpenCV_INCLUDE_DIR})
+    set (OPENCV_INCLUDE_DIRS ${OpenCV_INCLUDE_DIR} ${OpenCV_INCLUDE_DIRS})
   elseif (PKG_CONFIG_FOUND)
     pkg_check_modules(OPENCV REQUIRED opencv4)
   else()
@@ -164,6 +161,10 @@ else()
   endif()
 endif()
 
+message(STATUS "OpenCV Include directories:")
+message(STATUS ${OPENCV_INCLUDE_DIRS})
+message(STATUS ${OPENCV_INCLUDE_DIR})
+
 set(ENABLE_EXPORTS, true)
 set (CMAKE_CXX_STANDARD 11)
 set (CMAKE_CXX_EXTENSIONS OFF)
@@ -171,6 +172,7 @@ set (CMAKE_CXX_STANDARD_REQUIRED YES)
 
 set( MAIN_SRC
   src/safebmp.cc
+  src/safejpg.cc
   src/vmslideconv.cc
   src/jpgcachesupport.cc
   src/tilecachesupport.cc
@@ -232,12 +234,85 @@ else()
   list(APPEND MAIN_SRC src/console-unix.cc)
 endif()
 
-include_directories(${MAGICKCORE_INCLUDE_DIRS} ${MAGICKWAND_INCLUDE_DIRS} ${OPENCV_INCLUDE_DIRS} ${LIBJPEG_INCLUDE_DIRS} ${LIBTIFF_INCLUDE_DIRS} ${LIBOPENJPEG_INCLUDE_DIRS} ${MINIZIP_INCLUDE_DIRS} ${ZLIB_INCLUDE_DIR} C:/msys64/mingw64/include/openjpeg-2.4 ${CMAKE_CURRENT_SOURCE_DIR}/include)
+include(CheckSymbolExists)
+check_symbol_exists(strerror   string.h HAVE_STRERROR)
+check_symbol_exists(strerror_r string.h HAVE_STRERROR_R)
+check_symbol_exists(strerror_s string.h HAVE_STRERROR_S)
+
+check_symbol_exists(localtime   time.h HAVE_LOCALTIME)
+check_symbol_exists(localtime_r time.h HAVE_LOCALTIME_R)
+check_symbol_exists(localtime_s time.h HAVE_LOCALTIME_S)
+
+check_symbol_exists(strncpy_s string.h HAVE_STRNCPY_S)
+check_symbol_exists(_putenv stdlib.h HAVE__PUTENV)
+
+check_symbol_exists(fopen_s stdio.h HAVE_FOPEN_S)
+
+if (HAVE_STRERROR)
+  add_definitions(-DHAVE_STRERROR)
+endif()
+
+if (HAVE_STRERROR_R)
+  message(STATUS "Performing ${CMAKE_PROJECT_NAME} Test HAVE_GLIBC_STRERROR_R")
+  try_compile(HAVE_GLIBC_STRERROR_R
+    ${CMAKE_BINARY_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/CMake/compilertests.cc
+    OUTPUT_VARIABLE HAVE_GLIBC_STRERROR_R)
+
+  message(STATUS "Performing ${CMAKE_PROJECT_NAME} Test HAVE_POSIX_STRERROR_R")
+  try_compile(HAVE_POSIX_STRERROR_R
+    ${CMAKE_BINARY_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/CMake/compilertests.cc
+    OUTPUT_VARIABLE HAVE_POSIX_STRERROR_R)
+
+  if (HAVE_GLIBC_STRERROR_R)
+    add_definitions(-DHAVE_GLIBC_STRERROR_R)
+  elseif (HAVE_POSIX_STRERROR_R)
+    add_definitions(-DHAVE_POSIX_STRERROR_R)
+  endif()
+endif()
+
+if (HAVE_STRERROR_S)
+  add_definitions(-DHAVE_STRERROR_S)
+endif()
+
+if (HAVE_LOCALTIME)
+  add_definitions(-DHAVE_LOCALTIME)
+endif()
+
+if (HAVE_LOCALTIME_R)
+  add_definitions(-DHAVE_LOCALTIME_R)
+endif()
+
+if (HAVE_LOCALTIME_S)
+  add_definitions(-DHAVE_LOCALTIME_S)
+endif()
+
+if (HAVE_STRNCPY_S)
+  add_definitions(-DHAVE_STRNCPY_S)
+endif()
+
+if (HAVE__PUTENV)
+  add_definitions(-DHAVE__PUTENV)
+endif()
+
+if (HAVE_FOPEN_S)
+  add_definitions(-DHAVE_FOPEN_S)
+endif()
+
+include_directories(${MAGICKCORE_INCLUDE_DIRS} ${MAGICKWAND_INCLUDE_DIRS} ${OPENCV_INCLUDE_DIRS} ${LIBJPEG_INCLUDE_DIRS} ${LIBTIFF_INCLUDE_DIRS} ${LIBOPENJPEG_INCLUDE_DIRS} ${MINIZIP_INCLUDE_DIRS} ${ZLIB_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/include)
 add_executable( vmslideconv ${MAIN_SRC} ${MAIN_HEADERS} )
 target_link_libraries( vmslideconv ${MAGICKWAND_LIBRARIES} ${MAGICKCORE_LIBRARIES} ${OPENCV_LIBRARIES} ${LIBTIFF_LIBRARIES} ${LIBJPEG_LIBRARIES} ${LIBOPENJPEG_LIBRARIES} ${MINIZIP_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 
+if (MSVC)
+  target_compile_options(vmslideconv PRIVATE /W4 /WX)  
+elseif (${CMAKE_CXX_COMPILER_ID} MATCHES "GNU")
+  set(CMAKE_CXX_FLAGS_DEBUG "-g -pg -O0 -Wall -Wextra -Wpedantic")
+  set(CMAKE_CXX_FLAGS_RELEASE "-g -O3 -Wall -Wextra -Wpedantic")
+endif()
+
 add_executable( svsinfo ${INFO_SRC} )
-target_link_libraries( svsinfo ${LIBTIFF_LIBRARIES} ${LIBOPENJPEG_LIBRARIES})
+target_link_libraries( svsinfo ${LIBTIFF_LIBRARIES} ${LIBOPENJPEG_LIBRARIES} ${OPENCV_LIBRARIES})
 
 install(TARGETS vmslideconv DESTINATION bin)
 install(TARGETS svsinfo DESTINATION bin)

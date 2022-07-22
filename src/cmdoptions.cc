@@ -79,7 +79,7 @@ CmdOptions & CmdOptions::operator << (CmdOptions& out, int value)
 std::string CmdOptions::str() 
 {
   std::string fullSyntax;
-  size_t maxColWidth1 = maxFirstColWidth();
+  size_t maxColCols1 = maxFirstColCols();
   
   std::string options = col1.str();
   std::string details = col2.str();
@@ -89,14 +89,14 @@ std::string CmdOptions::str()
   int startLine=0;
   do
   {
-    for (int i=0; i < maxColWidth1; i++)
+    for (int i=0; i < maxColCols1; i++)
     {
       if (i < options.length())
       {
         key = options[i];
         if (key == '\n')
         {
-          for (int x=0; x < maxColWidth1 - (i - startLine); x++)
+          for (int x=0; x < maxColCols1 - (i - startLine); x++)
           {
             options.append(" ");
           }
@@ -113,7 +113,7 @@ std::string CmdOptions::str()
     {
       lastSpacePos = i;
     }
-    if (lineLength+1 >= mTerminalWidth)
+    if (lineLength+1 >= mTerminalCols)
     {
       fullSyntax.append(details.substr(startLinePos, lastSpacePos));
       fullSyntax.append("\n");

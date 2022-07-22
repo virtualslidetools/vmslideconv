@@ -9,8 +9,8 @@ bool VirtualSlide::isValidObject()
 void VirtualSlide::baseClearAttribs()
 {
   mValidObject = false;
-  mBaseWidth = 0;
-  mBaseHeight = 0;
+  mBaseCols = 0;
+  mBaseRows = 0;
   mBkgColor = 255;
   mTotalZLevels = 0;
   mTotalTopZLevels = 0;
@@ -47,14 +47,14 @@ bool VirtualSlide::getMagFound()
   return mMagFound;
 }
 
-long long VirtualSlide::getBaseWidth() 
+long long VirtualSlide::getBaseCols() 
 { 
-  return (mValidObject == true ? mBaseWidth : 0); 
+  return (mValidObject == true ? mBaseCols : 0); 
 }
 
-long long VirtualSlide::getBaseHeight() 
+long long VirtualSlide::getBaseRows() 
 { 
-  return (mValidObject == true ? mBaseHeight : 0); 
+  return (mValidObject == true ? mBaseRows : 0); 
 }
 
 std::string VirtualSlide::getHumanDesc()
@@ -67,58 +67,52 @@ std::string VirtualSlide::getCopyrightTxt()
   return mCopyrightTxt; 
 }
 
-bool VirtualSlide::allocate(safeBmp* pBmp, int level, int64_t x, int64_t y, int64_t width, int64_t height, bool useActualWidth)
+bool VirtualSlide::allocate(safeBmp* pBmp, int level, int64_t x, int64_t y, int64_t cols, int64_t rows, bool useActualCols)
 {
   if (mValidObject == false || level<0 || level > getTotalLevels() || checkLevel(level) == false)
   {
     return false;
   }
-  int64_t fullWidth = 0;
-  int64_t fullHeight = 0;
-  if (useActualWidth)
+  int64_t fullCols = 0;
+  int64_t fullRows = 0;
+  if (useActualCols)
   {
-    fullWidth = getActualWidth(level);
-    fullHeight = getActualHeight(level);
+    fullCols = getActualCols(level);
+    fullRows = getActualRows(level);
   }
   else
   {
-    fullWidth = getLevelWidth(level);
-    fullHeight = getLevelHeight(level);
+    fullCols = getLevelCols(level);
+    fullRows = getLevelRows(level);
   }
-  if (x > fullWidth || y > fullHeight)
+  if (x > fullCols || y > fullRows)
   {
     std::cerr << "x or y out of bounds: x=" << x << " y=" << y;
     return false;
   }
-  if (width <= 0 || height <= 0)
+  if (cols <= 0 || rows <= 0)
   {
-    std::cerr << "width or height out of bounds: width=" << width << " height=" << height;
+    std::cerr << "cols or rows out of bounds: cols=" << cols << " rows=" << rows;
     return false;
   }
   int samplesPerPixel = 3;
-  /*
-  if (setGrayScale || mGrayScale)
+  int64_t maxCols = cols;
+  int64_t maxRows = rows;
+  if (x + cols > fullCols)
   {
-    samplesPerPixel = 1;
+    maxCols = fullCols - x;
   }
-  */
-  int64_t maxWidth = width;
-  int64_t maxHeight = height;
-  if (x + width > fullWidth)
+  if (y + rows > fullRows)
   {
-    maxWidth = fullWidth - x;
-  }
-  if (y + height > fullHeight)
-  {
-    maxHeight = fullHeight - y;
+    maxRows = fullRows - y;
   }
 
-  int64_t bmpSize = maxWidth * maxHeight * samplesPerPixel;
+  int64_t bmpSize = maxCols * maxRows * samplesPerPixel;
   if (bmpSize > 512 * 1024 * 1024)
   {
     std::cout << "allocating " << (bmpSize / (1024 * 1024)) << " megabytes in memory." << std::endl;
   }
-  BYTE* data = safeBmpAlloc2(pBmp, maxWidth, maxHeight);
+  BYTE* data = safeBmpAlloc2(pBmp, maxCols, maxRows);
   return (data ? true : false);
 }
 

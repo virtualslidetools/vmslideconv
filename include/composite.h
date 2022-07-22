@@ -22,6 +22,7 @@ THE SOFTWARE.
 #ifndef __COMPOSITE_FILE_H
 #define __COMPOSITE_FILE_H
 
+#include "safebmp.h"
 #include "imagesupport.h"
 #include "tiffsupport.h"
 #include "virtualslide.h"
@@ -86,7 +87,7 @@ public:
   const char* mName;
   bool mFound;
   double mxAdj, myAdj;
-  int64_t mTotalWidth, mTotalHeight;
+  int64_t mTotalCols, mTotalRows;
   bool mIsPreviewSlide;
 public:
   IniConf();
@@ -96,9 +97,9 @@ public:
 class JpgIniConf : public IniConf 
 {
 public:
-  int64_t mPixelWidth, mPixelHeight;
-  int64_t mDetailedWidth, mDetailedHeight;
-  int64_t mOrgDetailedWidth, mOrgDetailedHeight;
+  int64_t mPixelCols, mPixelRows;
+  int64_t mDetailedCols, mDetailedRows;
+  int64_t mOrgDetailedCols, mOrgDetailedRows;
   int64_t mTotalTiles;
   int64_t mxMin, mxMax, myMin, myMax;
   int64_t mxDiffMin, myDiffMin;
@@ -120,8 +121,8 @@ public:
   bool operator() (const IniConf *iniConf1, const IniConf *iniConf2);
 };
 
-bool drawXHighlight(BYTE *pBmp, int samplesPerPixel, int64_t y1, int64_t x1, int64_t x2, int64_t width, int64_t height, int thickness, int position);
-bool drawYHighlight(BYTE *pBmp, int samplesPerPixel, int64_t x1, int64_t y1, int64_t y2, int64_t width, int64_t height, int thickness, int position);
+bool drawXHighlight(BYTE *pBmp, int samplesPerPixel, int64_t y1, int64_t x1, int64_t x2, int64_t cols, int64_t rows, int thickness, int position);
+bool drawYHighlight(BYTE *pBmp, int samplesPerPixel, int64_t x1, int64_t y1, int64_t y2, int64_t cols, int64_t rows, int thickness, int position);
 
 
 
@@ -137,19 +138,10 @@ public:
   void compositeClearAttribs();
   void compositeCleanup();
   void close() { compositeCleanup(); baseCleanup(); compositeClearAttribs(); baseClearAttribs(); }
-  bool open(const std::string& inputDir, int options, int orientation, int debugLevel = 0, int64_t bestXOffset = -1, int64_t bestYOffset = -1, safeBmp **pImageL2 = NULL); 
-  bool read(safeBmp *pDestBmp, int level, int direction, int zLevel, int64_t x, int64_t y, int64_t width, int64_t height, int64_t *readWidth, int64_t *readHeight);
+  bool open(const std::string& inputDir, int options, int debugLevel = 0); 
+  bool read(safeBmp *pDestBmp, int level, int direction, int zLevel, int64_t x, int64_t y, int64_t cols, int64_t rows, int64_t *readCols, int64_t *readRows);
 
-  #ifndef USE_MAGICK
-  bool findXYOffset(int lowerLevel, int higherLevel, int64_t *bestXOffset0, int64_t *bestYOffset0, int64_t *bestXOffset1, int64_t *bestYOffset1, int optUseCustomOffset, int debugLevel, std::fstream& logFile);
-  #endif
-
-  #ifndef USE_MAGICK
-  bool loadFullImage(int level, safeBmp **ptpFullImage, cv::Mat **ptpMatImage, int orientation, double xZoomOut, double yZoomOut, bool useZoom, int optDebug, std::fstream& logFile);
-  #else
-  bool loadFullImage(int level, safeBmp **ptpImageL2, void **ptpMatImage, int orientation, double xZoomOut, double yZoomOut, bool useZoom, int optDebug, std::fstream& logFile);
-  #endif
- 
+  safeBmp* loadFullImage(int level, int orientation, double xZoomOut, double yZoomOut, bool useZoom, int optDebug, std::ofstream& logFile);
   bool checkLevel(int level);
   bool checkZLevel(int level, int direction, int zLevel);
 
@@ -157,7 +149,7 @@ public:
   bool setOrientation(int orientation, std::fstream& logFile);
 
   static bool testHeader(BYTE*, int64_t);
-  bool drawBorder(BYTE *pBuff, int samplesPerPixel, int64_t x, int64_t y, int64_t width, int64_t height, int level);
+  bool drawBorder(BYTE *pBuff, int samplesPerPixel, int64_t x, int64_t y, int64_t cols, int64_t rows, int level);
   std::vector<JpgFileXY>* getTileXYArray(int level); 
   bool isPreviewSlide(int level); 
   int getTotalLevels();
@@ -165,25 +157,16 @@ public:
   int getTotalBottomZLevels();
   int getTotalTopZLevels();
   int getQuality(int level);
-  int64_t getPixelWidth(int level);
-  int64_t getPixelHeight(int level);
-  int64_t getActualWidth(int level);
-  int64_t getActualHeight(int level);
-  int64_t getLevelWidth(int level);
-  int64_t getLevelHeight(int level);
+  int64_t getPixelCols(int level);
+  int64_t getPixelRows(int level);
+  int64_t getActualCols(int level);
+  int64_t getActualRows(int level);
+  int64_t getLevelCols(int level);
+  int64_t getLevelRows(int level);
   double getXAdj(int level);
   double getYAdj(int level);
   int64_t getTotalTiles(int level);
   bool parseMagStr(std::string magLine);
 };
-
-
-#ifndef USE_MAGICK
-class CVMatchCompare
-{
-public:
-  bool operator() (const cv::DMatch& match1, const cv::DMatch& match2);
-};
-#endif
 
 #endif

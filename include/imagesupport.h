@@ -55,11 +55,11 @@ int dprintf(const char* format, ...);
 
 class Image {
 protected:
-  int64_t mActualWidth, mActualHeight;
+  int64_t mActualCols, mActualRows;
   int mBitCount;
   int mSamplesPerPixel;
   int mLevel;
-  int64_t mReadWidth, mReadHeight;
+  int64_t mReadCols, mReadRows;
   bool mValidObject;
   std::string mFileName;
   std::vector<BYTE> mInfo;
@@ -77,10 +77,10 @@ public:
   std::string getFileName() { return mFileName; }
   virtual bool open(const std::string& newFileName, bool setGrayScale = false) = 0;
   int getSamplesPerPixel() { return mSamplesPerPixel; }
-  int64_t getActualWidth()  { return (mValidObject) ? mActualWidth : 0; }
-  int64_t getActualHeight() { return (mValidObject) ? mActualHeight : 0; }
-  int64_t getReadWidth() { return (mValidObject) ? mReadWidth : 0; }
-  int64_t getReadHeight() { return (mValidObject) ? mReadHeight : 0; }
+  int64_t getActualCols()  { return (mValidObject) ? mActualCols : 0; }
+  int64_t getActualRows() { return (mValidObject) ? mActualRows : 0; }
+  int64_t getReadCols() { return (mValidObject) ? mReadCols : 0; }
+  int64_t getReadRows() { return (mValidObject) ? mReadRows : 0; }
   bool isValidObject() { return mValidObject; }
   void getErrMsg(std::string& errStr) { errStr = mErrMsg.str(); }
   void setUnfilledColor(BYTE newColor) { mBkgColor = newColor; }

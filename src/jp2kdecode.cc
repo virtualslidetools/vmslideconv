@@ -85,22 +85,22 @@ static void unpack_argb(jp2k_colorspace space,
       int32_t c2_row_base = y * comps[2].w;
       int32_t x;
       for (x = 0; x < w - 1; x += 2) {
-        uint8_t c0 = comps[0].data[c0_row_base + x];
-        uint8_t c1 = comps[1].data[c1_row_base + (x / 2)];
-        uint8_t c2 = comps[2].data[c2_row_base + (x / 2)];
+        uint8_t c0 = (uint8_t) comps[0].data[c0_row_base + x];
+        uint8_t c1 = (uint8_t) comps[1].data[c1_row_base + (x / 2)];
+        uint8_t c2 = (uint8_t) comps[2].data[c2_row_base + (x / 2)];
         int16_t R_chroma = _R_Cr[c2];
         int16_t G_chroma = (_G_Cb[c1] + _G_Cr[c2]) >> 16;
         int16_t B_chroma = _B_Cb[c1];
         write_pixel_ycbcr(dest, c0, R_chroma, G_chroma, B_chroma);
         dest += 3;
-        c0 = comps[0].data[c0_row_base + x + 1];
+        c0 = (uint8_t) comps[0].data[c0_row_base + x + 1];
         write_pixel_ycbcr(dest, c0, R_chroma, G_chroma, B_chroma);
         dest += 3;
       }
       if (x < w) {
-        uint8_t c0 = comps[0].data[c0_row_base + x];
-        uint8_t c1 = comps[1].data[c1_row_base + (x / 2)];
-        uint8_t c2 = comps[2].data[c2_row_base + (x / 2)];
+        uint8_t c0 = (uint8_t) comps[0].data[c0_row_base + x];
+        uint8_t c1 = (uint8_t) comps[1].data[c1_row_base + (x / 2)];
+        uint8_t c2 = (uint8_t) comps[2].data[c2_row_base + (x / 2)];
         int16_t R_chroma = _R_Cr[c2];
         int16_t G_chroma = (_G_Cb[c1] + _G_Cr[c2]) >> 16;
         int16_t B_chroma = _B_Cb[c1];
@@ -117,9 +117,9 @@ static void unpack_argb(jp2k_colorspace space,
       int32_t c1_row_base = (y / c1_sub_y) * comps[1].w;
       int32_t c2_row_base = (y / c2_sub_y) * comps[2].w;
       for (int32_t x = 0; x < w; x++) {
-        uint8_t c0 = comps[0].data[c0_row_base + (x / c0_sub_x)];
-        uint8_t c1 = comps[1].data[c1_row_base + (x / c1_sub_x)];
-        uint8_t c2 = comps[2].data[c2_row_base + (x / c2_sub_x)];
+        uint8_t c0 = (uint8_t) comps[0].data[c0_row_base + (x / c0_sub_x)];
+        uint8_t c1 = (uint8_t) comps[1].data[c1_row_base + (x / c1_sub_x)];
+        uint8_t c2 = (uint8_t) comps[2].data[c2_row_base + (x / c2_sub_x)];
         int16_t R_chroma = _R_Cr[c2];
         int16_t G_chroma = (_G_Cb[c1] + _G_Cr[c2]) >> 16;
         int16_t B_chroma = _B_Cb[c1];
@@ -138,9 +138,9 @@ static void unpack_argb(jp2k_colorspace space,
       int32_t c1_row_base = y * comps[1].w;
       int32_t c2_row_base = y * comps[2].w;
       for (int32_t x = 0; x < w; x++) {
-        uint8_t c0 = comps[0].data[c0_row_base + x];
-        uint8_t c1 = comps[1].data[c1_row_base + x];
-        uint8_t c2 = comps[2].data[c2_row_base + x];
+        uint8_t c0 = (uint8_t) comps[0].data[c0_row_base + x];
+        uint8_t c1 = (uint8_t) comps[1].data[c1_row_base + x];
+        uint8_t c2 = (uint8_t) comps[2].data[c2_row_base + x];
         write_pixel_rgb(dest, c0, c1, c2);
         dest += 3;
       }
@@ -154,9 +154,9 @@ static void unpack_argb(jp2k_colorspace space,
       int32_t c1_row_base = (y / c1_sub_y) * comps[1].w;
       int32_t c2_row_base = (y / c2_sub_y) * comps[2].w;
       for (int32_t x = 0; x < w; x++) {
-        uint8_t c0 = comps[0].data[c0_row_base + (x / c0_sub_x)];
-        uint8_t c1 = comps[1].data[c1_row_base + (x / c1_sub_x)];
-        uint8_t c2 = comps[2].data[c2_row_base + (x / c2_sub_x)];
+        uint8_t c0 = (uint8_t) comps[0].data[c0_row_base + (x / c0_sub_x)];
+        uint8_t c1 = (uint8_t) comps[1].data[c1_row_base + (x / c1_sub_x)];
+        uint8_t c2 = (uint8_t) comps[2].data[c2_row_base + (x / c2_sub_x)];
         write_pixel_rgb(dest, c0, c1, c2);
         dest += 3;
       }
@@ -176,6 +176,8 @@ static void unpack_argb(jp2k_colorspace space,
 
 static void info_callback(const char *msg, void *data)
 {
+  (void) msg;
+  (void) data;
   return;
 }
 
@@ -183,6 +185,7 @@ static void info_callback(const char *msg, void *data)
 static void warning_callback(const char *msg,
                              void *data) 
 {
+  (void) data;
   if (msg)
   {
     printf("OpenJPEG warning: %s\n", msg);
@@ -192,6 +195,7 @@ static void warning_callback(const char *msg,
 
 static void error_callback(const char *msg, void *data) 
 {
+  (void) data;
   // OpenJPEG can produce obscure error messages, so make sure to
   if (msg)
   {
@@ -209,7 +213,7 @@ static OPJ_SIZE_T read_callback(void *buf, OPJ_SIZE_T count, void *data)
     return (OPJ_SIZE_T) -1;
   }
   memcpy(buf, state->data + state->offset, count);
-  state->offset += count;
+  state->offset += (int32_t) count;
   return count;
 }
 
@@ -234,7 +238,7 @@ static OPJ_BOOL seek_callback(OPJ_OFF_T offset, void *data)
   if (offset < 0 || offset > state->length) {
     return OPJ_FALSE;
   }
-  state->offset = offset;
+  state->offset = (int32_t) offset;
   return OPJ_TRUE;
 }
 

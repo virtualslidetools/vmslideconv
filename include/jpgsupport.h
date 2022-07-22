@@ -41,13 +41,9 @@ public:
   void jpgClearAttribs();
   void jpgCleanup();
   bool open(const std::string& newFileName, bool setGrayScale = false);
-  bool read(safeBmp* pBmpDest, int64_t x, int64_t y, int64_t width, int64_t height);
+  bool read(safeBmp* pBmpDest, int64_t x, int64_t y, int64_t cols, int64_t rows);
   void close() { jpgCleanup(); baseCleanup(); jpgClearAttribs(); baseClearAttribs(); }
   static bool testHeader(BYTE*, int);
 };
-
-bool my_jpeg_write(std::string& newFileName, BYTE *pFullBitmap, int64_t width, int64_t height, int quality, std::string* perrMsg);
-bool my_jpeg_compress(BYTE** ptpCompressedBitmap, BYTE *pFullBitmap, int64_t width, int64_t height, int quality, std::string* perrMsg, unsigned long *pOutSize);
-void my_jpeg_free(BYTE** ptpCompressedBitmap);
 
 #endif

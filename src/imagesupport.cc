@@ -36,13 +36,13 @@ int dprintf(const char* format, ...)
 
 void Image::baseClearAttribs()
 {
-  mActualWidth = 0;
-  mActualHeight = 0;
+  mActualCols = 0;
+  mActualRows = 0;
   mBitCount = 0; 
   mSamplesPerPixel = 0; 
   mLevel = 0;
-  mReadWidth = 0;
-  mReadHeight = 0;
+  mReadCols = 0;
+  mReadRows = 0;
   mValidObject = false;
   mFileName = "";
   mBitmapSize = 0;

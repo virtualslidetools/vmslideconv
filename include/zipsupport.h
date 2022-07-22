@@ -18,7 +18,7 @@
 #include "zip.h"
 #define OLY_DEF_COMPRESS_METHOD     Z_NO_COMPRESSION
 #define OLY_DEF_COMPRESS_LEVEL      Z_DEFAULT_STRATEGY
-#define OLY_ZIP_VERSION_MADE_BY     1
+#define OLY_ZIP_VERSION_MADE_BY     0
 #define OLY_ZIP_OK                  Z_OK
 #define OLY_APPEND_STATUS_CREATE    APPEND_STATUS_CREATE
 #endif
@@ -47,6 +47,8 @@
 typedef uint8_t BYTE;
 #endif
 
+#define ZIPFILE_ERR_BUFF_SIZE 1024
+
 class ZipFile
 {
 protected:
@@ -59,6 +61,7 @@ protected:
   int64_t mTotalProcessed;
   int64_t mMaxBytes;
   std::vector<std::string> mDirNames;
+  char mErrBuff[ZIPFILE_ERR_BUFF_SIZE];
 public:
   ~ZipFile() { closeArchive(); }
   static const char mZipPathSeparator = '/';
