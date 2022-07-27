@@ -77,7 +77,15 @@ int ZipFile::flushArchive()
 int ZipFile::closeArchive()
 {
   if (mZipArchive == NULL) return 0;
+  
+  #ifdef HAVE_ZIPCLOSE_64
   int status = zipClose_64(mZipArchive, NULL);
+  #elif defined(HAVE_ZIPCLOSE64)
+  int status = zipClose64(mZipArchive, NULL);
+  #else
+  int status = zipClose(mZipArchive, NULL);
+  #endif
+
   if (status != ZIP_OK)
   {
     mErrMsg = getErrnoStrErr();
@@ -99,21 +107,22 @@ int ZipFile::addFile(std::string filename, BYTE* buff, int64_t size)
   time(&currentTime);
   
   zinfo.mz_dos_date = unix2dostime(&currentTime);
-  //zinfo.internal_fa = 0644;
-  //zinfo.external_fa = 0644 << 16L;
+  zinfo.internal_fa = 0644;
+  zinfo.external_fa = 0644 << 16L;
 
-  #ifdef zipOpenNewFileInZip
-  int status = zipOpenNewFileInZip(mZipArchive, filename.c_str(), &zinfo, 
-    NULL, 0, NULL, 0, mCompressMethod, mCompressFlags);
-  #elseif zipOpenNewFileInZip_64
+  #ifdef HAVE_ZIPOPENNEWFILEINZIP_64
   int status = zipOpenNewFileInZip_64(mZipArchive, filename.c_str(), &zinfo, 
-    NULL, 0, NULL, 0, NULL, mCompressMethod, mCompressFlags, 
-    (size > 0xFFFFFFFFLL) ? 1 : 0); 
-  #else
+    NULL, 0, NULL, 0, NULL, mCompressMethod, mCompressFlags, 1); 
+  #elif HAVE_ZIPOPENNEWFILEINZIP64
+  int status = zipOpenNewFileInZip64(mZipArchive, filename.c_str(), &zinfo, 
+    NULL, 0, NULL, 0, NULL, mCompressMethod, mCompressFlags, 1); 
+  #elif defined(HAVE_ZIPOPENNEWFILEINZIP4_64)
   int status = zipOpenNewFileInZip4_64(mZipArchive, filename.c_str(), &zinfo, 
     NULL, 0, NULL, 0, NULL, mCompressMethod, mCompressFlags, 
-    0, 0, 0, 0, NULL, 0, OLY_ZIP_VERSION_MADE_BY, 0, 
-    (size > 0xFFFFFFFFLL) ? 1 : 0); 
+    0, 0, 0, 0, NULL, 0, OLY_ZIP_VERSION_MADE_BY, 0, 1); 
+  #else
+  int status = zipOpenNewFileInZip(mZipArchive, filename.c_str(), &zinfo, 
+    NULL, 0, NULL, 0, mCompressMethod, mCompressFlags);
   #endif
 
   if (status == ZIP_OK)
@@ -121,7 +130,11 @@ int ZipFile::addFile(std::string filename, BYTE* buff, int64_t size)
     status = zipWriteInFileInZip(mZipArchive, size == 0 ? (BYTE*) "" : buff, (unsigned) size);
     if (status == ZIP_OK)
     {
+      #ifdef HAVE_ZIPCLOSEFILEINZIP64
+      status = zipCloseFileInZip64(mZipArchive);
+      #else
       status = zipCloseFileInZip(mZipArchive);
+      #endif
       if (status != ZIP_OK)
       {
         mErrMsg = getErrnoStrErr();
@@ -130,7 +143,11 @@ int ZipFile::addFile(std::string filename, BYTE* buff, int64_t size)
     else
     {
       mErrMsg = getErrnoStrErr();
-      zipCloseFileInZip(mZipArchive);
+      #ifdef HAVE_ZIPCLOSEFILEINZIP64
+      status = zipCloseFileInZip64(mZipArchive);
+      #else
+      status = zipCloseFileInZip(mZipArchive);
+      #endif
     }
   }
   else
@@ -151,8 +168,8 @@ int ZipFile::addDir(std::string name)
   memset(&zinfo, 0, sizeof(zinfo));
   time(&currentTime);
   zinfo.mz_dos_date = unix2dostime(&currentTime);
-  //zinfo.internal_fa = 0755;
-  //zinfo.external_fa = 040755 << 16L;
+  zinfo.internal_fa = 0755;
+  zinfo.external_fa = 040755 << 16L;
 
   std::string nameWithSlash=name;
   std::size_t lastSlashIndex = name.find_last_of(mZipPathSeparator);
@@ -166,25 +183,30 @@ int ZipFile::addDir(std::string name)
     return ZIP_OK;
   }
 
-  #ifdef zipOpenNewFileInZip
-  int status = zipOpenNewFileInZip(mZipArchive, nameWithSlash.c_str(), 
-    &zinfo, NULL, 0, NULL, 0, OLY_DEF_COMPRESS_METHOD, 0);
-  #elseif zipOpenNewFileInZip_64
+  #ifdef HAVE_ZIPOPENNEWFILEINZIP_64
   status = zipOpenNewFileInZip_64(mZipArchive, nameWithSlash.c_str(), 
-    &zinfo, NULL, 0, NULL, 0, NULL, OLY_DEF_COMPRESS_METHOD, 0, 
-    0); 
-  #else
+    &zinfo, NULL, 0, NULL, 0, OLY_DEF_COMPRESS_METHOD, 1);
+  #elif HAVE_ZIPOPENNEWFILEINZIP64
+  status = zipOpenNewFileInZip64(mZipArchive, nameWithSlash.c_str(), 
+    &zinfo, NULL, 0, NULL, 0, NULL, OLY_DEF_COMPRESS_METHOD, 0, 1);
+  #elif defined(HAVE_ZIPOPENNEWFILEINZIP4_64)
   status = zipOpenNewFileInZip4_64(mZipArchive, nameWithSlash.c_str(), 
     &zinfo, NULL, 0, NULL, 0, NULL, OLY_DEF_COMPRESS_METHOD, 0, 
-    0, 0, 0, 0, NULL, 0, OLY_ZIP_VERSION_MADE_BY, 0, 
-    0); 
+    0, 0, 0, 0, NULL, 0, OLY_ZIP_VERSION_MADE_BY, 0, 1); 
+  #else
+  status = zipOpenNewFileInZip(mZipArchive, nameWithSlash.c_str(), 
+    &zinfo, NULL, 0, NULL, 0, OLY_DEF_COMPRESS_METHOD, 0);
   #endif
 
   if (status == ZIP_OK)
   {
     zipWriteInFileInZip(mZipArchive, "", 0);
     mDirNames.push_back(nameWithSlash);
+    #ifdef HAVE_ZIPCLOSEFILEINZIP64
+    status = zipCloseFileInZip64(mZipArchive);
+    #else
     status = zipCloseFileInZip(mZipArchive);
+    #endif
   }
   if (status != ZIP_OK)
   {

@@ -108,8 +108,14 @@ make install
 sudo yum install git
 sudo yum groupinstall 'Development Tools'
 
-# Install libjpeg, libtiff, and ncurses by typing:
-sudo yum install libjpeg-turbo-devel libtiff-devel ncurses-devel
+# Install libjpeg, libtiff, openjpeg2, and ncurses by typing:
+sudo yum install libjpeg-turbo-devel libtiff-devel ncurses-devel openjpeg2-devel
+
+# For CentOS-Stream 9 use the below two lines to enable epel repo
+dnf config-manager --set-enabled crb
+dnf install epel-release epel-next-release
+
+# Install minizip-devel
 sudo yum install minizip-devel
 
 # -- BUILD OPENCV OR DOWNLOAD DEVELOPMENT RPM FOR IT --
@@ -144,7 +150,7 @@ sudo ldconfig
 cd ..
 
 # -- GRAB THE VMSLIDECONV IF YOU HAVEN'T ALREADY AND COMPILE --
-git clone https://github.com/paulrichards321/vmslideconv.git
+git clone https://github.com/virtualslidetools/vmslideconv.git
 cd vmslideconv 
 mkdir build
 cmake ..
@@ -161,16 +167,16 @@ sudo apt update
 sudo apt install build-essential
 
 # Install cmake and pkgconfig
-sudo apt install pkgconfig cmake
+sudo apt install pkg-config cmake
 
 # Install libjpeg, libtiff, libopencv by typing:
-sudo apt install libjpeg-turbo-dev libtiff-dev libopencv-dev
+sudo apt install libjpeg-turbo8-dev libtiff-dev libopencv-dev libopenjp2-7-dev
 
 # Install minizip and ncurses-dev
 sudo apt install libminizip-dev libncurses-dev
 
 # -- GRAB VMSLIDECONV IF YOU HAVEN'T ALREADY AND COMPILE --
-git clone https://github.com/paulrichards321/vmslideconv.git
+git clone https://github.com/virtualslidetools/vmslideconv.git
 cd vmslideconv
 mkdir build
 cd build

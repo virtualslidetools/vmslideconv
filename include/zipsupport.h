@@ -31,14 +31,6 @@
 #endif
 #endif
 
-#ifndef zipClose_64
-#define zipClose_64 zipClose
-#endif
-
-#ifndef zipCloseFileInZip64
-#define zipCloseFileInZip64 zipCloseFileInZip
-#endif
-
 #include <vector>
 #include <string>
 #include <cstdint>
