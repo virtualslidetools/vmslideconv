@@ -4,6 +4,15 @@
 #include <cerrno>
 #include <ctime>
 #include <cstring>
+#include <cerrno>
+#include <cstdio>
+#include <sys/stat.h>
+
+#if defined(WIN32) || defined(WIN64)
+#include <sys/types.h>
+#else
+#include <unistd.h>
+#endif
 
 static uint32_t unix2dostime(time_t *time);
 
@@ -47,8 +56,41 @@ std::string getErrnoStrErr()
 int ZipFile::openArchive(std::string filename, int append)
 {
   int status = 0;
+  bool isExistingFile = false;
+
   mOutputFile = filename;
   mDirNames.clear();
+
+  #if defined(WIN32) || defined(WIN64)
+  struct _stat sb;
+  status = _stat(filename.c_str(), &sb);
+  if (status != -1)
+  {
+    isExistingFile = (sb.st_mode & _S_IFREG) != 0 ? true : false;
+    if (isExistingFile == false)
+    {
+      std::cout << "Error: Path '" << filename << "' exists and is not a regular file." << std::endl;
+      return -1;
+    }
+  }
+  #else
+  struct stat sb;
+  status = stat(filename.c_str(), &sb);
+  if (status != -1)
+  {
+    isExistingFile = (sb.st_mode & S_IFREG) != 0 ? true : false;
+    if (isExistingFile == false)
+    {
+      std::cout << "Error: Path '" << filename << "' exists and is not a regular file." << std::endl;
+      return -1;
+    }
+  }
+  #endif
+  if (isExistingFile)
+  {
+    remove(filename.c_str());
+  }
+
   mZipArchive = zipOpen64(mOutputFile.c_str(), append);
   if (mZipArchive == NULL)
   {
