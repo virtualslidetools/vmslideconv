@@ -97,6 +97,10 @@ int ZipFile::openArchive(std::string filename, int append)
     mErrMsg = getErrnoStrErr();
     status = -1;
   }
+  else
+  {
+    status = 0;
+  }
   return status;
 }
 
