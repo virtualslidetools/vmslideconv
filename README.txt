@@ -36,6 +36,12 @@
 #-------------------------------------------------------------------------
 # First install Visual Studio 2019 or later with git and cmake
 # Then install vcpkg if you have not already
+
+# Replace directory 'c:\src' in all the following lines with whatever 
+# directory you use for your root source directory on Windows
+mkdir c:\src
+cd c:\src
+c:
 git clone https://github.com/Microsoft/vcpkg.git
 set VCPKG_DEFAULT_TRIPLET=x64-windows
 .\vcpkg\bootstrap-vcpkg.bat
@@ -46,8 +52,8 @@ git clone https://github.com/virtualslidetools/vmslideconv
 # Run cmake with the path to your vcpkg toolchain file
 # You will need to change that path if you installed vcpkg 
 # somewhere else
-cmake -B vmslideconv-build -S vmslideconv -DCMAKE_TOOLCHAIN_FILE=.\vcpkg\scripts\buildsystems\vcpkg.cmake -DCMAKE_BUILD_TYPE=Release
-msbuild .\build\vmslideconv.sln
+cmake -B vmslideconv-build -S vmslideconv -DCMAKE_TOOLCHAIN_FILE=c:\src\vcpkg\scripts\buildsystems\vcpkg.cmake -DCMAKE_BUILD_TYPE=Release
+msbuild c:\src\vmslideconv-build\vmslideconv.sln
 
 # --------------------------------------------------------------------------
 # METHOD 2 - Compiling vmslideconv on Windows with msys2
