@@ -3,7 +3,7 @@
 #---------------------------------------------------------------------------
 # A Virtual Microscopy slide convertor that can convert to and from the
 # the following formats:
-A   a. TIFF/SVS file format to to Google Maps jpeg dataset format
+#   a. TIFF/SVS file format to to Google Maps jpeg dataset format
 #   b. Olympus/Bacus ini jpeg dataset convertor to Google Maps jpeg dataset
 #   c. Olympus/Bacus ini jpeg dataset to TIFF/SVS file format
 
@@ -22,7 +22,7 @@ A   a. TIFF/SVS file format to to Google Maps jpeg dataset format
 #---------------------------------------------------------------------------
 # Skip to method 1 if you are using Visual Studio 2019 on Windows 10.
 # Skip to method 2 if you are using Msys2 on Windows 10.
-# Skip to method 3 if you are using RedHat/CentOS-Stream 8.
+# Skip to method 3 if you are using RedHat/CentOS-Stream 8 or 9.
 # Skip to method 4 if you are using Ubuntu 20.04.
 # Skip to usage notes at the bottom of this document if you are interested
 # in how to use the command line program.
@@ -102,7 +102,8 @@ make install
 # and libtiff, and some other generic C/C++ runtime MSYS2 dlls.
 
 #--------------------------------------------------------------------------
-# METHOD 3: Compiling vmslideconv on Redhat 8/CentOS-Stream 8
+# METHOD 3: Compiling vmslideconv on Redhat 8/9 or CentOS-Stream 8/9
+#            or similiar
 #--------------------------------------------------------------------------
 # Install git and development tools if you haven't done so already
 sudo yum install git
@@ -138,13 +139,13 @@ cmake -D CMAKE_BUILD_TYPE=RELEASE -D OPENCV_GENERATE_PKGCONFIG=ON ..
 make
 sudo make install
 
-# When you build opencv manually, it places it's library files in 
-# /usr/local/lib64. You will need /usr/local/lib64 in your LD Path if it 
-# isn't already there. You can add this by dropped adding a file in 
-# /etc/ld.so.conf called usrlocallib64.conf:
+# For Redhat/CentOS 8, when you build opencv manually, it places it's 
+# library files in /usr/local/lib64, and you will need /usr/local/lib64
+# in your LD Path if it isn't already there. You can add this by adding 
+# a file in /etc/ld.so.conf called usrlocallib64.conf:
 sudo sh -c 'echo "/usr/local/lib64" > /etc/ld.so.conf.d/usrlocallib64.conf'
 
-# Run ldconfig:
+# Redhat/CentOS 8 you will need to run ldconfig:
 sudo ldconfig
 
 # Now go back to your vmslideconv directory:
