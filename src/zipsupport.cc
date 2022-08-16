@@ -168,7 +168,7 @@ int ZipFile::addFile(std::string filename, BYTE* buff, int64_t size)
     0, 0, 0, 0, NULL, 0, OLY_ZIP_VERSION_MADE_BY, 0, 1); 
   #else
   int status = zipOpenNewFileInZip(mZipArchive, filename.c_str(), &zinfo, 
-    NULL, 0, NULL, 0, mCompressMethod, mCompressFlags);
+    NULL, 0, NULL, 0, NULL, mCompressMethod, mCompressFlags);
   #endif
 
   if (status == ZIP_OK)
@@ -241,7 +241,7 @@ int ZipFile::addDir(std::string name)
     0, 0, 0, 0, NULL, 0, OLY_ZIP_VERSION_MADE_BY, 0, 1); 
   #else
   status = zipOpenNewFileInZip(mZipArchive, nameWithSlash.c_str(), 
-    &zinfo, NULL, 0, NULL, 0, OLY_DEF_COMPRESS_METHOD, 0);
+    &zinfo, NULL, 0, NULL, 0, NULL, OLY_DEF_COMPRESS_METHOD, 0);
   #endif
 
   if (status == ZIP_OK)

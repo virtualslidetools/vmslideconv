@@ -35,13 +35,16 @@
 # METHOD 1: Compiling vmslideconv with Visual Studio 2019 on Windows 10 
 #-------------------------------------------------------------------------
 # First install Visual Studio 2019 or later with git and cmake
-# Then install vcpkg if you have not already
 
-# Replace directory 'c:\src' in all the following lines with whatever 
-# directory you use for your root source directory on Windows
-mkdir c:\src
-cd c:\src
+# Set ROOTSRC to where you want to place vcpkg and vmslideconv
+set ROOTSRC=c:\src
+
+# Switch to whatever your root drive of your ROOTSRC is
 c:
+mkdir %ROOTSRC%
+cd %ROOTSRC%
+
+# Install vcpkg if not already done so
 git clone https://github.com/Microsoft/vcpkg.git
 set VCPKG_DEFAULT_TRIPLET=x64-windows
 .\vcpkg\bootstrap-vcpkg.bat
@@ -50,10 +53,10 @@ set VCPKG_DEFAULT_TRIPLET=x64-windows
 git clone https://github.com/virtualslidetools/vmslideconv
 
 # Run cmake with the path to your vcpkg toolchain file
-# You will need to change that path if you installed vcpkg 
-# somewhere else
-cmake -B vmslideconv-build -S vmslideconv -DCMAKE_TOOLCHAIN_FILE=c:\src\vcpkg\scripts\buildsystems\vcpkg.cmake -DCMAKE_BUILD_TYPE=Release
-msbuild c:\src\vmslideconv-build\vmslideconv.sln
+# You will need to set ROOTSRC to the root of where you installed vcpkg 
+# if you have not already done so above
+cmake -B vmslideconv-build -S vmslideconv -DCMAKE_TOOLCHAIN_FILE=%ROOTSRC%\vcpkg\scripts\buildsystems\vcpkg.cmake -DCMAKE_BUILD_TYPE=Release
+msbuild %ROOTSRC%\vmslideconv-build\vmslideconv.sln
 
 # --------------------------------------------------------------------------
 # METHOD 2 - Compiling vmslideconv on Windows with msys2
