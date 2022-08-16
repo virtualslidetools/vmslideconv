@@ -231,7 +231,7 @@ int ZipFile::addDir(std::string name)
 
   #ifdef HAVE_ZIPOPENNEWFILEINZIP_64
   status = zipOpenNewFileInZip_64(mZipArchive, nameWithSlash.c_str(), 
-    &zinfo, NULL, 0, NULL, 0, OLY_DEF_COMPRESS_METHOD, 1);
+    &zinfo, NULL, 0, NULL, 0, NULL, OLY_DEF_COMPRESS_METHOD, 0, 1);
   #elif HAVE_ZIPOPENNEWFILEINZIP64
   status = zipOpenNewFileInZip64(mZipArchive, nameWithSlash.c_str(), 
     &zinfo, NULL, 0, NULL, 0, NULL, OLY_DEF_COMPRESS_METHOD, 0, 1);

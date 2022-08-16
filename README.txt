@@ -108,12 +108,13 @@ make install
 sudo yum install git
 sudo yum groupinstall 'Development Tools'
 
-# Install libjpeg, libtiff, openjpeg2, and ncurses by typing:
-sudo yum install libjpeg-turbo-devel libtiff-devel ncurses-devel openjpeg2-devel
-
-# For CentOS-Stream 9 use the below two lines to enable epel repo
+# For CentOS-Stream 9 you will neeed to use the below two lines to enable
+# epel repo for openjpeg2-devel
 dnf config-manager --set-enabled crb
 dnf install epel-release epel-next-release
+
+# Install libjpeg, libtiff, openjpeg2, and ncurses by typing:
+sudo yum install libjpeg-turbo-devel libtiff-devel ncurses-devel openjpeg2-devel
 
 # Install minizip-devel
 sudo yum install minizip-devel
