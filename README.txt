@@ -120,8 +120,8 @@ sudo yum groupinstall 'Development Tools'
 
 # For CentOS-Stream 9 you will neeed to use the below two lines to enable
 # epel repo for openjpeg2-devel
-dnf config-manager --set-enabled crb
-dnf install epel-release epel-next-release
+sudo dnf config-manager --set-enabled crb
+sudo dnf install epel-release epel-next-release
 
 # Install libjpeg, libtiff, openjpeg2, and ncurses by typing:
 sudo yum install libjpeg-turbo-devel libtiff-devel ncurses-devel openjpeg2-devel
